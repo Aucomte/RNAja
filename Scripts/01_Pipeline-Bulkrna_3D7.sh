@@ -82,7 +82,7 @@ if [ ! -d "05-Mapping_STAR" ];then
          --genomeDir  /Users/COHEN/Documents/BulkRNA/AnalysesBioinformatiques/02_Genome/05_Index_STAR \
          --readFilesIn $f1 $f2 \
          --readFilesCommand gunzip -c \
-         --outFileNamePrefix /Users/COHEN/Documents/BulkRNA/AnalysesBioinformatiques/05-Mapping_BWA/"/"$f3 \
+         --outFileNamePrefix /Users/COHEN/Documents/BulkRNA/AnalysesBioinformatiques/05-Mapping_STAR/"/"$f3 \
          --outSAMtype BAM SortedByCoordinate \
          --sjdbGTFfile /Users/COHEN/Documents/BulkRNA/AnalysesBioinformatiques/02_Genome/plasmodb-46_pfalciparum3d7_gffread.gtf \
          --sjdbGTFtagExonParentTranscript Parent \
