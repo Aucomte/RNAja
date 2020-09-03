@@ -66,9 +66,9 @@ fi
 
 cd $GENERAL
 #Mapping with STAR
-if [ ! -d "05-Mapping_BWA" ];then
+if [ ! -d "05-Mapping_STAR" ];then
   echo "########################### Mapping with STAR ##########################"
-  mkdir "05-Mapping_BWA"
+  mkdir "05-Mapping_STAR"
   cd $PATH_DATA_TRIM
 
   for f1 in *_1_paired.fq.gz
