@@ -1,0 +1,478 @@
+# Importation des librairies glob, sys, et re
+import glob,sys,re
+
+## appel du fichier de config
+configfile: "configPT.yaml"
+
+## Definition des variables "constantes" à partir du fichier config (attention aux arborescences dans le yaml)
+REFERENCE_DIR = config['REFERENCE']
+FASTA_REF= config['FASTA']
+GFF_REF= config['GFF']
+GTF_REF= config['GTF']
+READS_DIR = config['READS']
+FASTQC_DIR = config['FASTQC']
+FASTQSCREEN_DIR = config['FASTQSCREEN']
+FASTP_DIR = config['FASTP']
+FASTQC_AF_DIR = config['FASTQC_AF']
+MULTIQC_DIR = config['MULTIQC']
+INDEX_DIR = config['INDEX']
+INDEX_STAR_DIR = config['INDEX_STAR']
+MAPPINGH_DIR = config['MAPPINGH']
+MAPPINGS_DIR = config['MAPPING_STAR']
+BAM_DIR = config['BAMFILES']
+STATS_DIR = config['STATS']
+FILTER_DIR = config['FILTER']
+DUPL_DIR = config['DUPL']
+HTSEQ_DIR = config['HTSEQ']
+
+#Wild cards
+REFERENCE, = glob_wildcards(f"{REFERENCE_DIR}{{reference}}.fasta")
+ANNOTATION, = glob_wildcards(f"{REFERENCE_DIR}{{annotation}}.gff")
+READS, = glob_wildcards(f"{READS_DIR}{{reads}}_r1.fastq.gz")
+SAMPLEFQ, = glob_wildcards(f"{FASTQC_DIR}{{samplefq}}.html")
+SAMPLEFS, = glob_wildcards(f"{FASTQSCREEN_DIR}{{samplefs}}.html")
+SAMPLEFQAF, = glob_wildcards(f"{FASTQC_AF_DIR}{{samplefqaf}}.html")
+BAM, = glob_wildcards(f"{BAM_DIR}{{bam}}.bam")
+
+
+# Regle finale pour vérifier la présence des outputs et si ils sont présents ils ne lancent pas le job
+rule final:
+     input:
+          #out_fastqc = expand(f"{FASTQC_DIR}{{reads}}_r1_fastqc.html", reads = READS),
+          #out_fastqs = expand(f"{FASTQSCREEN_DIR}{{reads}}_r1_screen.html", reads = READS),
+          #out_fastp = expand(f"{FASTP_DIR}{{reads}}_r1_paired.fastq.gz", reads = READS),
+          #out_fastqc_af = expand(f"{FASTQC_AF_DIR}{{reads}}_r1_paired_fastqc.html", reads = READS),
+          out_multiqc = expand(f"{MULTIQC_DIR}multiqc_report.html"),
+          #out_hisat_idx = expand(f"{INDEX_DIR}_3D7"),
+          #out_hisat_map = expand(f"{MAPPINGH_DIR}{{reads}}_HISAT.bam" , reads = READS),
+          #out_star_map = expand(f"{MAPPINGS_DIR}{{reads}}Aligned.sortedByCoord.out.bam" , reads = READS),
+          out_bam_index = expand(f"{BAM_DIR}{{bam}}.bam.bai", bam = BAM),
+          out_bam_stats = expand(f"{STATS_DIR}{{bam}}_flagstat.txt", bam = BAM),
+          #out_bam_md = expand(f"{DUPL_DIR}{{bam}}_marked_dup_metrics.txt", bam = BAM),
+          out_htseq = expand(f"{HTSEQ_DIR}{{bam}}_mapped_htseq.txt", bam = BAM)
+
+# FastQC before filtering
+rule fastqc:
+     """ 
+          FastQC - Control Quality of reads
+     """
+     threads:4
+     params:
+          out_fastqc=directory(f"{FASTQC_DIR}")
+     input:
+          r1 = f"{READS_DIR}{{reads}}_r1.fastq.gz",
+          r2 = f"{READS_DIR}{{reads}}_r2.fastq.gz"
+     output:
+          out_fastqc = f"{FASTQC_DIR}{{reads}}_r1_fastqc.html"
+     message:
+          """
+               Execute {rule}
+               input=
+                    r1 = {input.r1}
+                    r2 = {input.r2}
+               threads={threads}
+          """
+     shell:
+          """
+               fastqc -o {params.out_fastqc} -t 4 {input.r1} {input.r2}
+          """
+
+# FastQScreen agaisnt 3D7 and human
+rule fastqscreen:
+     """ 
+          FastQScreen - Control Quality of reads
+     """
+     threads:4
+     params:
+          out_fastqs=directory(f"{FASTQSCREEN_DIR}")
+     input:
+          r1 = f"{READS_DIR}{{reads}}_r1.fastq.gz",
+          r2 = f"{READS_DIR}{{reads}}_r2.fastq.gz"
+     output:
+          out_fastqs = f"{FASTQSCREEN_DIR}{{reads}}_r1_screen.html"
+     message:
+          """
+               Execute {rule}
+               input=
+                    r1 = {input.r1}
+                    r2 = {input.r2}
+               threads={threads}
+          """
+     shell:
+          """
+               fastq_screen --conf /Users/COHEN/Documents/Logiciels/FastQ-Screen-0.14.1/fastq_screen.conf --aligner BOWTIE2 {input.r1} {input.r2} --outdir {params.out_fastqs}
+          """
+
+# Filtering and trimming with FastP
+rule fastp:
+     """ 
+          FastP - Filtering and trimming before mapping
+     """
+     threads:8
+     params:
+          out_fastp=directory(f"{FASTP_DIR}")
+     input:
+          r1 = f"{READS_DIR}{{reads}}_r1.fastq.gz",
+          r2 = f"{READS_DIR}{{reads}}_r2.fastq.gz"
+     output:
+          out_paired_r1 = f"{FASTP_DIR}{{reads}}_r1_paired.fastq.gz",
+          out_unpaired_r1 = f"{FASTP_DIR}{{reads}}_r1_unpaired.fastq.gz",
+          out_paired_r2 = f"{FASTP_DIR}{{reads}}_r2_paired.fastq.gz",
+          out_unpaired_r2 = f"{FASTP_DIR}{{reads}}_r2_unpaired.fastq.gz",
+          out_report= f"{FASTP_DIR}{{reads}}_report.html"
+     message:
+          """
+               input={input.r1},{input.r2}
+               threads={threads}
+          """
+     shell:
+          """
+               fastp --in1 {input.r1} --in2 {input.r2} --out1 {output.out_paired_r1} --out2 {output.out_paired_r2}  --unpaired1 {output.out_unpaired_r1} --unpaired2 {output.out_unpaired_r2} -w 1 -h {output.out_report}  
+          """
+
+# FastQC after filtering
+rule fastqc_af:
+     """ 
+          FastQC - Control Quality of reads after FastP
+     """
+     threads:4
+     params:
+          out_fastqc_af=directory(f"{FASTQC_AF_DIR}")
+     input:
+          r1 = f"{FASTP_DIR}{{reads}}_r1_paired.fastq.gz",
+          r2 = f"{FASTP_DIR}{{reads}}_r2_paired.fastq.gz"
+     output:
+          out_fastqc_af = f"{FASTQC_AF_DIR}{{reads}}_r1_paired_fastqc.html"
+     message:
+          """
+               Execute {rule}
+               input={input.r1},{input.r2}
+               threads={threads}
+          """
+     shell:
+          """
+               fastqc -o {params.out_fastqc_af} -t 4 {input.r1} {input.r2}
+          """
+
+# FastQScreen agaisnt 3D7 and human
+rule multi_qc:
+     """
+           MultiQC
+     """
+     params:
+          out_multi = directory(f"{MULTIQC_DIR}")
+     input:
+          expand(f"{FASTQC_DIR}{{samplefq}}.html", samplefq = SAMPLEFQ),
+          expand(f"{FASTQC_DIR}{{samplefq}}.zip", samplefq = SAMPLEFQ),
+          expand(f"{FASTQSCREEN_DIR}{{samplefs}}.html", samplefs = SAMPLEFS),
+          expand(f"{FASTQSCREEN_DIR}{{samplefs}}.txt", samplefs = SAMPLEFS),
+          expand(f"{FASTQC_AF_DIR}{{samplefqaf}}.html", samplefqaf = SAMPLEFQAF),
+          expand(f"{FASTQC_AF_DIR}{{samplefqaf}}.zip", samplefqaf = SAMPLEFQAF)
+
+     output:
+          f"{MULTIQC_DIR}multiqc_report.html",
+     shell:
+          """
+               multiqc {input} -o {params.out_multi}
+          """
+
+# Indexing of 3D7 genome (environ 1 min)
+rule hisat2_index:
+    """                                                                                                                                                                                       
+    Make index with HISAT2 for 3D7                                                                                                                                                 
+    """
+    threads: 8
+    input:
+        fasta = f"{FASTA_REF}"
+    output:
+        index = f"{INDEX_DIR}P.Falci_3D7",
+    message:
+        """                                                                                                                                                                                   
+        Execute {rule}                                                                                                                                                                    
+        input:                                                                                                                                                                            
+            fasta : {input.fasta}                                                                                                                                                       
+        output:                                                                                                                                                                           
+            index: {output.index}                                                                                                                     
+        """
+    log:
+        output = f"{INDEX_DIR}LOG/3D7_HISAT-INDEX.o",
+        error = f"{INDEX_DIR}LOG/3D7_HISAT-INDEX.e",
+    shell:
+        """
+        ln -s {input.fasta} {output.index} 1>{log.output} 2>{log.error}
+         /Users/COHEN/Documents/Logiciels/hisat2-2.2.0/hisat2-build {input.fasta} {output.index} --quiet
+        """
+
+# Mapping with HISAT2 on Pf 3D7 (max 2 min par échantillon, total 10 min)
+rule hisat2_map:
+    """
+    Map reads on the genome with HISAT2 on paired end
+    """
+    threads: 4
+    input:
+        reference = rules.hisat2_index.output.index,
+        r1 = f"{FASTP_DIR}{{reads}}_r1_paired.fastq.gz",
+        r2 = f"{FASTP_DIR}{{reads}}_r2_paired.fastq.gz"
+    output:
+        summary = f"{MAPPINGH_DIR}{{reads}}_HISAT_summary.txt",
+        bam = f"{MAPPINGH_DIR}{{reads}}_HISAT.bam",
+    message:
+        """                                                                                                                                                                            
+        Execute {rule}                                                                                                                                                                   
+        input:                                                                                                                                                                            
+            reference : {input.reference}
+            R1 : {input.r1}
+            R2 : {input.r2}                                                                                                                                                       
+        output:                                                                                                                                                                           
+            bam: {output.bam}                                                                                                 
+        """
+    shell:
+        """
+        /Users/COHEN/Documents/Logiciels/hisat2-2.2.0/hisat2 -p {threads} -x {input.reference} -1 {input.r1} -2 {input.r2} --summary-file {output.summary} | samtools view -S -b >{output.bam} 
+        """
+
+#Convert GFF in GTF with gffread for RNA-STAR
+rule gff_to_gtf:
+    """                                                                                                                                                                                       
+    Convert GFF in GTF for RNA-STAR                                                                                                                                                 
+    """
+    threads: 8
+    input:
+        gff = f"{REFERENCE_DIR}{{annotation}}.gff"
+    output:
+        gtf = f"{REFERENCE_DIR}{{annotation}}.gtf"
+    message:
+        """                                                                                                                                                                                   
+        Execute {rule}                                                                                                                                                                    
+        input:                                                                                                                                                                            
+            gff : {input.gff}                                                                                                                                                       
+        output:                                                                                                                                                                           
+            gtf: {output.gtf}                                                                                                                     
+        """
+    shell:
+        """
+        /Users/COHEN/Documents/Logiciels/gffread-0.12.2.OSX_x86_64/gffread {input.gff} -T -o {output.gtf}
+        """
+
+#Indexing for RNA-STAR (environ 2 min)
+rule star_index:
+    """
+    Make index with STAR for 3D7
+    """
+    threads: 4
+    params:
+        dir = directory(f"{INDEX_STAR_DIR}")
+    input:
+        fasta = f"{FASTA_REF}",
+        gtf = f"{GTF_REF}",
+    output:
+        index = f"{INDEX_STAR_DIR}Log.out",
+    message:
+        """
+        Execute {rule}
+        input:
+            fasta : {input.fasta}
+            gtf : {input.gtf}
+        output:
+            index: {output.index}
+        """
+    shell:
+        """
+        ln -s {input.fasta} {output.index}
+        /Users/COHEN/Documents/Logiciels/STAR-2-7-5c/bin/MacOSX_x86_64/STAR --runMode genomeGenerate --runThreadN {threads} --genomeDir {params.dir} --genomeFastaFiles {input.fasta} --sjdbGTFfile {input.gtf}
+   
+        """
+
+#Mapping with RNA-STAR on Pf 3D7 (environ 10 min par échantillon, total 1h)
+rule star_mapping:
+    """
+    Map reads on the genome with STAR on paired end
+    """
+    threads: 4
+    params:
+        idx = directory(f"{INDEX_STAR_DIR}"),
+        bam = f"{MAPPINGS_DIR}{{reads}}"
+    input:
+        idx = rules.star_index.output.index,
+        gtf = f"{GTF_REF}",
+        r1 = f"{FASTP_DIR}{{reads}}_r1_paired.fastq.gz",
+        r2 = f"{FASTP_DIR}{{reads}}_r2_paired.fastq.gz"
+    output:
+        bam = f"{MAPPINGS_DIR}{{reads}}Aligned.sortedByCoord.out.bam"
+    message:
+        """
+        Execute {rule}
+        input:
+            idx : {params.idx}
+            gtf : {input.gtf}
+            reads : 
+                r1: {input.r1}
+                r2: {input.r2}
+        output:
+            bam: {output.bam}
+        """
+    shell:
+        """
+        /Users/COHEN/Documents/Logiciels/STAR-2-7-5c/bin/MacOSX_x86_64/STAR --runThreadN 4 --genomeDir {params.idx} --readFilesIn {input.r1} {input.r2} --readFilesCommand gunzip -c --outFileNamePrefix {params.bam} --outSAMtype BAM SortedByCoordinate --sjdbGTFfile {input.gtf} 
+        """
+
+#Sort the BAM files with samtools
+rule bam_sort:
+    """
+    Sort the BAM files     
+    """
+    threads: 4
+    input:
+        star = f"{MAPPINGS_DIR}{{reads}}Aligned.sortedByCoord.out.bam",
+        hisat = f"{MAPPINGH_DIR}{{reads}}_HISAT.bam"
+    output:
+          out_star = f"{BAM_DIR}{{reads}}_STAR.sort.bam",
+          out_hisat = f"{BAM_DIR}{{reads}}_HISAT.sort.bam"
+    message:
+        """
+        Execute {rule}
+        input:
+            star : {input.star}
+            hisat : {input.hisat}
+        output:
+            bam: {output.out_star}, {output.out_hisat}
+        """
+    shell:
+        """
+        samtools sort  {input.star} > {output.out_star};
+        samtools sort  {input.hisat} > {output.out_hisat}
+        """
+
+#Filtering of the BAM files with samtools
+rule bam_filter:
+    """
+    Filtering BAM files      
+    """
+    threads: 4
+    input:
+         bam = f"{BAM_DIR}{{bam}}.bam"
+    output:
+          mapped = f"{FILTER_DIR}{{bam}}.mapped.bam",
+          unmapped = f"{FILTER_DIR}{{bam}}.unmapped.bam"
+    message:
+        """
+        Execute {rule}
+        input: {input.bam}
+        
+        """
+    shell:
+        """
+        samtools view -b -F 4 {input.bam} > {output.mapped}
+        samtools view -b -f 4 {input.bam} > {output.unmapped}
+        """
+
+# Identify the duplicates in BAM with Picard tools
+rule bam_markdup:
+    """
+    Filtering BAM files      
+    """
+    threads: 4
+    #params:
+        # récupérer l'option dans le yaml . voir pour mettre un if . A regarder !!!
+    input:
+         bam = f"{BAM_DIR}{{bam}}.bam",
+         bam_fm = f"{FILTER_DIR}{{bam}}.mapped.bam",
+    output:
+        md = f"{DUPL_DIR}{{bam}}_marked_dup.bam",
+        md_txt = f"{DUPL_DIR}{{bam}}_marked_dup_metrics.txt",
+        mdm = f"{DUPL_DIR}{{bam}}_mapped_marked_dup.bam",
+        mdm_txt = f"{DUPL_DIR}{{bam}}_mapped_marked_dup_metrics.txt"
+    message:
+        """
+        Execute {rule}
+        input: {input.bam}
+        """
+    shell:
+        """
+        java -jar /Users/COHEN/Documents/Logiciels/picard.jar MarkDuplicates I={input.bam} O={output.md} M={output.md_txt}
+        java -jar /Users/COHEN/Documents/Logiciels/picard.jar MarkDuplicates I={input.bam_fm} O={output.mdm} M={output.mdm_txt}
+        """
+
+#Index the BAM files with samtools
+rule bam_index:
+    """
+    Index BAM files      
+    """
+    threads: 4
+    input:
+         bam = f"{BAM_DIR}{{bam}}.bam",
+         bam_fm = f"{FILTER_DIR}{{bam}}.mapped.bam",
+         bam_fu = f"{FILTER_DIR}{{bam}}.unmapped.bam",
+         bam_md = f"{DUPL_DIR}{{bam}}_marked_dup.bam",
+         bam_mdm= f"{DUPL_DIR}{{bam}}_mapped_marked_dup.bam"
+    output:
+        bai = f"{BAM_DIR}{{bam}}.bam.bai"
+    message:
+        """
+        Execute {rule}
+        input: {input.bam}
+        """
+    shell:
+        """
+        samtools index {input.bam}
+        samtools index {input.bam_fm}
+        samtools index {input.bam_fu}
+        samtools index {input.bam_md}
+        samtools index {input.bam_mdm}
+        """
+
+#Stats on the BAM files with samtools
+rule bam_stats:
+    """
+    Statistics data on the BAM files      
+    """
+    threads: 4
+    input:
+         bam = f"{BAM_DIR}{{bam}}.bam",
+         bam_fm = f"{FILTER_DIR}{{bam}}.mapped.bam",
+         bam_fu = f"{FILTER_DIR}{{bam}}.unmapped.bam",
+         bam_md = f"{DUPL_DIR}{{bam}}_marked_dup.bam",
+         bam_mdm= f"{DUPL_DIR}{{bam}}_mapped_marked_dup.bam"
+    output:
+        flagstat = f"{STATS_DIR}{{bam}}_flagstat.txt",
+        flagstat_m = f"{STATS_DIR}{{bam}}_mapped_flagstat.txt",
+        flagstat_u = f"{STATS_DIR}{{bam}}_unmapped_flagstat.txt",
+        flagstat_md = f"{STATS_DIR}{{bam}}_md_flagstat.txt",
+        flagstat_mdm = f"{STATS_DIR}{{bam}}_mapped_md_flagstat.txt",
+    message:
+        """
+        Execute {rule}
+        input: {input.bam}
+        """
+    shell:
+        """
+        samtools flagstat {input.bam} > {output.flagstat}
+        samtools flagstat {input.bam_fm} > {output.flagstat_m}
+        samtools flagstat {input.bam_fu} > {output.flagstat_u}
+        samtools flagstat {input.bam_md} > {output.flagstat_md}
+        samtools flagstat {input.bam_mdm} > {output.flagstat_mdm}
+        """
+
+#Create the count table from the BAM files with Picard tools
+rule htseq_counts :
+    """
+    Create the count table with HTseq-count      
+    """
+    threads: 4
+    input:
+         bam = f"{DUPL_DIR}{{bam}}_mapped_marked_dup.bam",
+         gtf = f"{GTF_REF}"
+    output:
+         count_table = f"{HTSEQ_DIR}{{bam}}_mapped_htseq.txt"
+    message:
+        """
+        Execute {rule}
+        input: 
+            bam: {input.bam}
+            gtf: {input.gtf}
+        output: {output.count_table}
+        """
+    shell:
+        """
+        htseq-count -t exon -i gene_id -f bam {input.bam} {input.gtf} > {output.count_table}
+        """
