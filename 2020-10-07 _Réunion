@@ -1,0 +1,101 @@
+#Réunion du 07-10-2020 - Valerie Aurore Julie et Antoine 
+
+
+## Filtration des reads avec le comtpage 
+
+Après le mapping je filtre les reads en créant un fichier avec ceux qui mapped et ceux qui ne mappent pas sur le génome de référence (Flag à 4 )
+Et je marque les duplicats sans les enlever .
+
+
+
+## HTSeq count output explications : 
+
+Commande : htseq-count -t exon -i gene_id -f bam {input.bam_star} {input.gtf} > {output.count_table_star}
+
+-t feature type (3eme colonne du GTF )
+-i id attribute 
+-f format de l'input
+-m par default sur union 
+--nonunique par default none 
+
+https://htseq.readthedocs.io/en/master/count.html
+
+Dans la table de comptage je dois avoir les comptages bruts des reads? ou je trouve cela ?
+
+si je comprends bien en utilisant le mode union de default , si le read est marjoritairement aligné sur le gene il est inclus dans la table de comptage même si il y a un intron entre deux exons
+
+si le read est aligné en chevauchant sur deux gènes  avec l'option --nonunique non (default) il est consideré comme ambigous, par contre avec l'option --nonunique all il est compté sur les deux gènes 
+Si le read est entièrement aligné sur deux gènes , il st considéré comme ambigous , ar contre avec l'option --nonunique all il est compté sur les deux gènes
+Si l'alignement indique qu'une fraction d'un read est aligné sur deux gènes  il est considéré comme aligment_not_unique, par contre avec l'option --nonunique all il est compté sur les deux gènes
+
+Avec le mode union les no features doivent exclusivement être des reads qui mappent sur autre chose que les exons ou les transcripts. donc les régions intergéniques 
+
+
+SI je mets l'option -m intersection strict 
+
+Si le read n'est pas à 100% aligné sur le gène il est considéré comme no feature 
+Si le read est aligné sur deux exons il est no feature 
+Si le read est aligné à 100% sur le gene A et aligné un peu sur le gene B il est considéré comme gene A alors qu'avec union ambigous (il prend le gèene sur lequel il mapped le plus ) 
+
+
+Si je mets l'option -m intersection_nonempty
+
+Si le read n'est pas à 100% aligné sur le gène il est considéré comme gene A
+Si le read est aligné sur deux exons il est gene A
+Si le read est aligné à 100% sur le gene A et aligné un peu sur le gene B il est considéré comme gene A alors qu'avec union ambigous (il prend le gèene sur lequel il mapped le plus )
+
+## Stringtie 
+
+Commande : voir le snakemake
+
+En faite je sors la même chose avec les deux commandes mais je ne comprends les deux étapes de Julie 
+table avec le TPM (trasncripts per million) et le FPKM (fragment per kilobase of exon per million read mapped )
+
+Les sorties dont déjà normalisées ->  sur? 
+
+
+
+##Questions à poser 
+1 - Quel mappeur et compteur utilise t'elle dans ses pipelines de RNA-seq ? 
+2 - Que penser de la sortie directe en table de comptage de RNA-STAR (mode Gene counts similaire à HT seq si je comprends bien)
+3 - Pour les sorties de HT seq faut il utiliser l'option --nonunique all ? 
+4 - au vu des outils utilisés dans quelques publis, est ce qu'on essaye d'autres compteurs ? 
+5 - Est ce qu'on fait une filtration des reads avant le comptage  plus poussée? 
+
+... a voir en fonction de la discussion
+
+
+
+## Pour DEseq
+
+Pas trop avancé la dessus. 
+
+
+
+Les mappeurs de RNA -seq il sont capable de répérer si ils sont dans l'exon 1 et l'exon 3 , ils regardent si le read paired 
+
+#Julie propose d'enlever les duplicats , mais attention il peut y avoir plusieurs isoformes possible. Ca dépend de la question que tu te poses . est ce que tu veux regarder les gènes ou égaement les isoformes des gènes ? 
+
+Tu peux juste voir avec les tables de comptage 
+
+on ne veut pplus sur FPKM , on calcule avec le TPM , normalement la normalisation se fait par la taille de l'échantillon . *
+
+Dans stringtie tu peux demander à normaliser les données 
+
+TPM va normaliser d'abord sur la totalité des reads puis par la longueur du gènes . 
+
+
+
+DEseq2 
+
+Correction Bonferonni a eviter 
+PLus tu fais des tests , plus ilya pus de chance d'avoir quelque chose de positif donc tu pondères .
+
+limma; edgeR ; DESeq2
+
+
+Kallisto /zlot 
+
+
+
+
