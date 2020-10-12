@@ -1,0 +1,27 @@
+# Dossiers que l'on va utiliser
+
+'REFERENCE': "/Users/COHEN/Documents/BulKRNA/AnalyseRNA-seq/01_Genome/"
+'FASTA': "/Users/COHEN/Documents/BulKRNA/AnalyseRNA-seq/01_Genome/plasmodb_pfalciparum3d7_genome.fasta"
+'GFF': "/Users/COHEN/Documents/BulKRNA/AnalyseRNA-seq/01_Genome/plasmodb-46_pfalciparum3d7.gff"
+'GTF': "/Users/COHEN/Documents/BulKRNA/AnalyseRNA-seq/01_Genome/plasmodb-46_pfalciparum3d7.gtf"
+'READS': "/Users/COHEN/Documents/BulKRNA/AnalyseRNA-seq/02_RawData/"
+'FASTQC': "/Users/COHEN/Documents/BulKRNA/AnalyseRNA-seq/03_FastQC/"
+'FASTQSCREEN': "/Users/COHEN/Documents/BulKRNA/AnalyseRNA-seq/04_FastQScreen/"
+'FASTP': "/Users/COHEN/Documents/BulKRNA/AnalyseRNA-seq/05_FastP/"
+'FASTQC_AF': "/Users/COHEN/Documents/BulKRNA/AnalyseRNA-seq/06_FastQC_AfterFT/"
+'MULTIQC': "/Users/COHEN/Documents/BulKRNA/AnalyseRNA-seq/07_MultiQC/"
+'INDEX': "/Users/COHEN/Documents/BulKRNA/AnalyseRNA-seq/08_Index_HISAT_3D7/"
+'MAPPINGH': "/Users/COHEN/Documents/BulKRNA/AnalyseRNA-seq/09_Mapping_HISAT_3D7/"
+'INDEX_STAR': "/Users/COHEN/Documents/BulKRNA/AnalyseRNA-seq/10_Index_STAR_3D7/"
+'MAPPING_STAR': "/Users/COHEN/Documents/BulKRNA/AnalyseRNA-seq/11_Mapping_STAR_3D7/"
+'BAMFILES': "/Users/COHEN/Documents/BulKRNA/AnalyseRNA-seq/12_BAMfiles/"
+'STATS': "/Users/COHEN/Documents/BulKRNA/AnalyseRNA-seq/14_Stats_BAM/"
+'FILTER': "/Users/COHEN/Documents/BulKRNA/AnalyseRNA-seq/13_Filtered_BAM/"
+'DUPL': "/Users/COHEN/Documents/BulKRNA/AnalyseRNA-seq/15_MarkedDupli_BAM/"
+'HTSEQ': "/Users/COHEN/Documents/BulKRNA/AnalyseRNA-seq/16_HTseq-count/"
+'STRINGTIE': "/Users/COHEN/Documents/BulKRNA/AnalyseRNA-seq/17_Stringtie/"
+'STRINGTIECC': "/Users/COHEN/Documents/BulKRNA/AnalyseRNA-seq/17_Stringtie/"
+'PREPDE': "/Users/COHEN/Documents/Logiciels/stringtie-2.1.4.OSX_x86_64/prepDE.py"
+
+
+###Options des logiciels
