@@ -52,9 +52,9 @@ rule final:
           out_htseq = expand(f"{HTSEQ_DIR}HISAT/{{reads}}.txt", reads = READS),
           #out_gtf_list = expand(f'{STRINGTIE_DIR}STRINGTIE_MERGE/STAR_gtf_list.txt'),
           #out_stringtie = expand(f'{STRINGTIE_DIR}STRINGTIE_MERGE/STAR_stringtie_merged.gtf'),
-          #out_stringtiecc = expand(f'{STRINGTIECC_DIR}STAR/{{reads}}/{{reads}}.gtf', reads=READS),
-          #out_gtf_list = expand(f'{STRINGTIECC_DIR}HISAT_gtf_list.txt'),
-          #out_strg_list = expand(f'{STRINGTIECC_DIR}HISAT_Stringtie_list.txt'),
+          out_stringtiecc = expand(f'{STRINGTIECC_DIR}STAR/{{reads}}/{{reads}}.gtf', reads=READS),
+          out_gtf_list = expand(f'{STRINGTIECC_DIR}HISAT_gtf_list.txt'),
+          out_strg_list = expand(f'{STRINGTIECC_DIR}HISAT_Stringtie_list.txt'),
           out_csv = expand(f'{STRINGTIECC_DIR}HISAT_transcript_count_matrix.csv')
 
 # FastQC before filtering
@@ -562,7 +562,6 @@ rule list_for_prepDE:
         star_list= f'{STRINGTIECC_DIR}STAR_Stringtie_list.txt',
         hisat_list= f'{STRINGTIECC_DIR}HISAT_Stringtie_list.txt'
     run:
-        star_ID= []
         star_list_name_reads= open(output.star_list, "w")
         hisat_list_name_reads= open(output.hisat_list, "w")
         star_gtf = open(rules.stringtie_gtf_list.output.gtf_star, "r")
@@ -570,9 +569,7 @@ rule list_for_prepDE:
         for i in range(len(READS)):
             name= READS[i]
             x=re.split("-", name)
-            y=x[0]
-            z=x[2]
-            ID = y+z
+            ID = x[0]+"_"+x[2]
             star_list_name_reads.write(ID + " " + star_gtf.readline())
             hisat_list_name_reads.write(ID + " " + hisat_gtf.readline())
 
