@@ -1,6 +1,0 @@
-#Fastq_screen version: 0.14.1	#Aligner: bowtie2	#Reads in subset: 100000
-Genome	#Reads_processed	#Unmapped	%Unmapped	#One_hit_one_genome	%One_hit_one_genome	#Multiple_hits_one_genome	%Multiple_hits_one_genome	#One_hit_multiple_genomes	%One_hit_multiple_genomes	Multiple_hits_multiple_genomes	%Multiple_hits_multiple_genomes
-Human	98889	77355	78.23	4631	4.68	7408	7.49	1293	1.31	8202	8.29
-Pf3D7	98889	19528	19.75	50942	51.51	18924	19.14	1230	1.24	8265	8.36
-
-%Hit_no_genomes: 7.57
