@@ -1,0 +1,11 @@
+name: quality
+channels:
+    - bioconda
+    - conda-forge
+    - defaults
+    - anaconda
+dependencies:
+    - fastp=0.20.1
+    - fastqc=0.11.9
+    - fastq-screen=0.14
+    - multiqc=1.9
