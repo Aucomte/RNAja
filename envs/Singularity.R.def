@@ -74,14 +74,16 @@ From: ubuntu:18.04
     R -e "install.packages('DT')"
     R -e "BiocManager::install('Rsamtools')"
     R -e "install.packages('Cairo')"
+    R -e "install.packages('plotly')"
+    R -e "install.packages('knitr')"
     R -e "BiocManager::install('GenomicRanges')"
     R -e "BiocManager::install('GenomicFeatures')"
     R -e "BiocManager::install('rtracklayer')"
     R -e "BiocManager::install('GenomicAlignments')"
     R -e "BiocManager::install(\
-                    c('svglite', 'readr', \
+                    c('edger', 'mixOmics', 'baySeq', 'svglite', 'readr', \
                     'paletteer', 'ShortRead', 'Rsubread', \
-                    'genefilter', 'systemPipeR', 'UpSetR') \
+                    'genefilter', 'systemPipeR', 'UpSetR', 'limma') \
     )"
 
 %environment
