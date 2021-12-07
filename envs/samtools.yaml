@@ -5,4 +5,4 @@ channels:
     - defaults
     - anaconda
 dependencies:
-    - samtools=1.11
+    - samtools=1.14

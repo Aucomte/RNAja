@@ -9,7 +9,7 @@
 ## this path should INCLUDE the executable filename.
 
 #BOWTIE	/usr/local/bin/bowtie/bowtie
-BOWTIE2 /Users/COHEN/Documents/Logiciels/bowtie2-2.4.1-macos-x86_64/bowtie2
+BOWTIE2 /usr/bin/bowtie2
 #BWA /usr/local/bwa/bwa
 
 

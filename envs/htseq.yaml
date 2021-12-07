@@ -5,4 +5,4 @@ channels:
     - defaults
     - anaconda
 dependencies:
-    - htseq=0.12.4
+    - htseq=0.13.5

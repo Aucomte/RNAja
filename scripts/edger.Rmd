@@ -1,0 +1,203 @@
+---
+title: "RNAseq with edgeR"
+author: "Aurore Comte"
+date: "`r Sys.time()`"
+output:
+  html_document:
+    code_folding: hide
+    highlight: tango
+    number_sections: yes
+    theme: cerulean
+    toc: yes
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
+  pdf_document:
+    toc: yes
+editor_options:
+  chunk_output_type: console
+---
+
+```{r knitrGlobalOpt}
+knitr::opts_chunk$set(dev='CairoPNG')
+options(knitr.table.format = "markdown")
+```
+
+# Load Packages
+
+```{r include=FALSE}
+.Last <- function() {
+  cat("Now saving current session to output dir:", outDir, "\n")
+  save.image(file = file.path(outDir, "session.RData"), compress = TRUE)
+  cat("bye bye...\n")
+}
+
+suppressMessages(library('knitr', warn.conflict = FALSE, quietly = TRUE))
+suppressMessages(library('edgeR', warn.conflict = FALSE, quietly = TRUE))
+suppressMessages(library('limma', warn.conflict = FALSE, quietly = TRUE))
+suppressMessages(library('RColorBrewer', warn.conflict = FALSE, quietly = TRUE))
+suppressMessages(library('mixOmics', warn.conflict = FALSE, quietly = TRUE))
+suppressMessages(library('baySeq', warn.conflict = FALSE, quietly = TRUE))
+suppressMessages(library('Cairo', warn.conflict = FALSE, quietly = TRUE))
+suppressMessages(library('plotly', warn.conflict = FALSE, quietly = TRUE))
+```
+
+```{r include=FALSE}
+opts_knit$set(root.dir = snakemake@params[["out_dir"]])
+
+##################### LOADING PARAMS FROM SNAKEMAKE OBJECT ######################
+gcsv_hisat <- snakemake@input[["gcsv_hisat"]]
+sample_info <- snakemake@input[["sample_info"]]
+comparaisons_file <- snakemake@input[["de_comparisons_file"]]
+
+outDir <- snakemake@params[["out_dir"]]
+invisible(dir.exists(outDir) || dir.create(path = outDir, mode = "770"))
+
+normCount_file <- snakemake@params[["normCount"]]
+resDE_file <- snakemake@params[["resDE"]]
+```
+
+```{r}
+gcsv_hisat <- "/home/comtea/Documents/PHIM/BURKADAPT/ProjetTuteur-_BulkRNA/output/3_count/STRINGTIE/HISAT_gene_count_matrix.csv"
+sample_info <- "/home/comtea/Documents/PHIM/BURKADAPT/ProjetTuteur-_BulkRNA/DATA/sample_info.txt"
+comparaisons_file <- "/home/comtea/Documents/PHIM/BURKADAPT/ProjetTuteur-_BulkRNA/DATA/treatmentsComparisons.csv"
+```
+
+# creation DGEList object
+
+```{r}
+pheno_data <- read.csv(sample_info)
+sampleInfo <- data.frame(fileName= pheno_data$SampleName, condition = pheno_data$Treatment, replicate= pheno_data$Experiment)
+rawCountTable <- as.matrix(read.csv(gcsv_hisat,row.names="gene_id"))
+
+dgList <- DGEList(rawCountTable, group=sampleInfo$condition, genes=rownames(rawCountTable))
+dgList
+```
+
+# exploration and QC
+
+
+```{r}
+pseudoCounts <- log2(dgList$counts+1)
+sampleDists <- as.matrix(dist(t(pseudoCounts)))
+
+#Boxplot for pseudo-counts
+boxplot(pseudoCounts, col="gray", las=3)
+
+par(mar=c(1,1,1,1))
+cimColor <- colorRampPalette(rev(brewer.pal(9, "Blues")))(16)
+cim(sampleDists, color=cimColor, symkey=FALSE, margins=c(1,1))
+```
+
+```{r}
+plotMDS(pseudoCounts)
+```
+
+# filtering
+
+First get rid of genes which did not occur frequently enough. We can choose this cutoff by saying we must have at least 100 counts per million (calculated with cpm() in R) on any particular gene that we want to keep. In this example, we're only keeping a gene if it has a cpm of 2 or greater for at least two samples.
+
+```{r}
+countsPerMillion <- cpm(dgList)
+countCheck <- countsPerMillion > 2
+keep <- which(rowSums(countCheck) >= 2)
+dgList <- dgList[keep,]
+summary(cpm(dgList))
+```
+
+# Normalisation
+
+it  is  important  to  normalize  RNA-seq  both  within  and  between  samples. edgeR implements the trimmed mean of M-values (TMM) method
+
+```{r}
+dgList <- calcNormFactors(dgList, method="TMM")
+
+eff.lib.size <- dgList$samples$lib.size*dgList$samples$norm.factors
+normCounts <- cpm(dgList)
+
+write.csv(normCounts, file=normCount_file)
+```
+
+```{r}
+pseudoNormCounts <- log2(normCounts + 1)
+plotMDS(pseudoNormCounts)
+```
+
+
+# Differential expression analysis
+
+## estimating the dispersion
+
+```{r}
+dgList <- estimateCommonDisp(dgList)
+dgList <- estimateTagwiseDisp(dgList)
+dgList
+```
+
+
+## DE and result
+
+```{r include = FALSE}
+# test en fonction des paires
+comp = read.csv(comparaisons_file)
+pair_txt = matrix(nrow=nrow(comp),ncol=2)
+for (lines in 1:nrow(comp)){
+  pair_txt[lines,1] = lines
+  pair_txt[lines,2] = knit_expand(text= "\n\n### {{comp[lines,1]}},{{comp[lines,2]}}\n\n")
+}
+```
+
+```{r, echo=FALSE,include = FALSE}
+# You need this code to conduct the magic dependences attaching...
+DT::datatable(matrix())
+```
+```{r, results='asis', echo=FALSE, message = FALSE, warning = FALSE}
+for (lines in 1:nrow(comp)){
+  cat(paste(knit(text = pair_txt[lines,2]), collapse = '\n'))
+
+  dgeTest <- exactTest(dgList, pair=c(comp[lines,1],comp[lines,2]))
+  dgeTest
+
+  cat("plot an histogram of unadjusted p-values\n\n")
+
+  hist(dgeTest$table[,"PValue"], breaks=50, main = "", xlab="pvalue")
+
+  resNoFilt <- topTags(dgeTest, n=nrow(dgeTest$table))
+
+  cat("number of differencialy expressed genes (risk: 1%)\n\n")
+
+  sum(resNoFilt$table$FDR < 0.01)
+  
+  sigDownReg <- resNoFilt$table[resNoFilt$table$FDR<0.01,]
+  sigDownReg <- sigDownReg[order(sigDownReg$logFC),]
+   cat(knitr::knit_print((DT::datatable(sigDownReg))))
+
+  resDE_file_name = paste0(resDE_file,'_',comp[lines,1],"-",comp[lines,2])
+  write.csv(resNoFilt, file=resDE_file_name)
+
+  y <- cpm(dgList, log=TRUE, prior.count = 1)
+  selY <- y[rownames(resNoFilt$table)[resNoFilt$table$FDR<0.01 & abs(resNoFilt$table$logFC)>1.5],]
+  cimColor <- colorRampPalette(rev(brewer.pal(9, "Blues")))(255)[255:1]
+  finalHM <- cim(t(selY), color=cimColor, symkey=FALSE, margins=c(0.1,0.1))
+
+  cat("create a MA plot with 1% differentially expressed genes\n\n")
+  plotSmear(dgeTest, de.tags = rownames(resNoFilt$table)[which(resNoFilt$table$FDR<0.01)], xlab = "Average LogCPM", ylab="logFC")
+
+  cat("\n\n#### gene clustering \n\n")
+
+  cat("We provide a cluster membership for each gene\n\n")
+
+  plot(finalHM$ddc, leaflab="none")
+  abline(h=10, lwd=2, col="pink")
+  
+  geneClust <- cutree(as.hclust(finalHM$ddc), h=10)
+
+  x = matrix(nrow = length(unique(geneClust)), ncol = 2)
+  for (i in 1:length(unique(geneClust))){
+    x[i,1] = i
+    x[i,2] = paste0(names(which(geneClust==i)), collapse = ", ")
+  }
+  cat(knitr::knit_print(DT::datatable(x)))
+}
+```
+

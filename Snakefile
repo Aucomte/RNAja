@@ -1,242 +1,231 @@
-# Importation des librairies glob, sys, et re
-import glob,sys,re
+import re, sys, glob, os, csv, pprint
+import pandas as pd
 from pathlib import Path
+from snakemake import WorkflowError
+#from snakemake import load_configfile
+from os import listdir
+import getpass
 
-## appel du fichier de config
-configfile: "configPT.yaml"
+###############################################################################
+# --- Importing Configuration Files --- #
 
-## Definition des variables "constantes" à partir du fichier config (attention aux arborescences dans le yaml)
-FASTA_REF= config['FASTA']
-GFF_REF= config['GFF']
-GTF_REF= config['GTF']
-READS_DIR = config['READS']
-OUTDIR = Path(config["OUTDIR"]).resolve().as_posix()
+#pprint.pprint(workflow.__dict__)
+if len(workflow.overwrite_configfiles) == 0:
+    logger.info("You need to use --configfile option to snakemake command line")
+    raise ValueError("You have to use --configfile option to snakemake command line")
+else:
+    path_config = workflow.overwrite_configfiles[0]
 
-FASTQC_DIR = f"{OUTDIR}/01_FastQC/"
-FASTQSCREEN_DIR = f"{OUTDIR}/02_FastQScreen/"
-FASTP_DIR = f"{OUTDIR}/03_FastP/"
-FASTQC_AF_DIR = f"{OUTDIR}/04_FastQC_afterFT/"
-MULTIQC_DIR = f"{OUTDIR}/05_MULTIQC/"
-INDEX_DIR = f"{OUTDIR}/06_Index_HISAT/"
-INDEX_STAR_DIR = f"{OUTDIR}/07_index_HISAT/"
-MAPPINGH_DIR = f"{OUTDIR}/08_mapping_HISAT/"
-MAPPINGS_DIR = f"{OUTDIR}/09_mapping_STAR/"
-BAM_DIR = f"{OUTDIR}/12_BAMfiles/"
-STATS_DIR = f"{OUTDIR}/14_Stats_BAM/"
-FILTER_DIR = f"{OUTDIR}/13_Filtered_BAM/"
-DUPL_DIR = f"{OUTDIR}/15_MarkedDupli_BAM/"
-HTSEQ_DIR = f"{OUTDIR}/16_HTseq-count/"
-STRINGTIE_DIR = f"{OUTDIR}/17_Stringtie/"
-name_hisat_index = config['name_hisat_index']
+#configfile: 'config/config.yaml'
+cluster_config: "config/cluster_config_slurm.yaml"
 
-## Software path
+###############################################################################
 
-fastQScreen_conf = config['FastQScreen_conf']
+# helper function
+def by_cond(cond, yes, no, cond_ext = '', no_ext = ''): # it's working but needs to be improved ...
+    if not cond_ext:
+        cond_ext = not cond
+    if cond:
+        return yes
+    elif cond_ext:
+        return no
+    else:
+        return no_ext
 
-#Wild cards
-READS, = glob_wildcards(f"{READS_DIR}{{reads}}.fastq.gz")
-MAPPING = ["STAR", "HISAT2"]
-COUNT = ["HTSEQ", "STINGTIE"]
+## cluster variables
 
-# Regle finale pour vérifier la présence des outputs et si ils sont présents ils ne lancent pas le job
+#user = getpass.getuser()
+
+#nasID = config['NASID']
+#HOST_PREFIX = by_cond(nasID, user + '@' + nasID + ':', '')
+
+##############################
+
+# check configfile:
+# existence of dir and validity of suffix
+
+
+# parse config file :
+out_dir = Path(config["DATA"]["directories"]["out_dir"]).resolve().as_posix()
+log_dir = Path(config["DATA"]["directories"]["out_dir"]+"/LOGS/").resolve().as_posix()
+annotation_path = Path(config["DATA"]["files"]["annotation"]).resolve().as_posix()
+reference_path = Path(config["DATA"]["files"]["reference"]).resolve().as_posix()
+samplefile = Path(config["DATA"]["files"]["sample_info"]).resolve().as_posix()
+name_hisat_index = "rice"
+
+# to lunch separator
+sep="#"
+
+#############################################
+# use threads define in cluster_config rule or rule default or default in snakefile
+#############################################
+
+def get_threads(rule, default):
+    """
+    use threads define in cluster_config rule or rule default or default in snakefile
+    give threads or 'cpus-per-task from cluster_config rule : threads to SGE and cpus-per-task to SLURM
+    """
+    #cluster_config = load_configfile(cluster_config)
+    if rule in cluster_config and 'threads' in cluster_config[rule]:
+        return int(cluster_config[rule]['threads'])
+    elif rule in cluster_config and 'cpus-per-task' in cluster_config[rule]:
+        return int(cluster_config[rule]['cpus-per-task'])
+    elif '__default__' in cluster_config and 'cpus-per-task' in cluster_config['__default__']:
+        return int(cluster_config['__default__']['cpus-per-task'])
+    elif '__default__' in cluster_config and 'threads' in cluster_config['__default__']:
+        return int(cluster_config['__default__']['threads'])
+    return default
+
+#*###############################################################################
+def final_return(wildcards):
+    dico_final = {
+                     "multiqc_fastqc" : expand(f"{out_dir}/6_MULTIQC/multiqc.html"),
+                     "fastqc" : expand(f"{out_dir}/1_QC/fastqc/{{fastq}}_raw_fastqc.html", fastq = SAMPLE_NAME),
+                     "baminfo" : f"{out_dir}/2_mapping/bamfile_info.txt",
+                     "STRINGTIE" : expand(f'{out_dir}/3_count/STRINGTIE/{{fastq}}.gtf', fastq = SAMPLE_NAME),
+                     "STRINGTIE_list" : f'{out_dir}/3_count/STRINGTIE/HISAT_Stringtie_list.txt',
+                     "gcsv_hisat" : f'{out_dir}/3_count/STRINGTIE/HISAT_gene_count_matrix.csv',
+                     "tcsv_hisat" : f'{out_dir}/3_count/STRINGTIE/HISAT_transcript_count_matrix.csv',
+                     "sRNA_diff_exp_html" : f"{out_dir}/4_DE_analysis/edger.html"
+                     }
+    return dico_final
+
+#*###############################################################################
+
+def unique(list1):
+    # intilize a null list
+    unique_list = []
+    for x in list1:
+        if x not in unique_list:
+            unique_list.append(x)
+    return(unique_list)
+
+def checkIfDuplicates_1(listOfElems):
+    ''' Check if given list contains any duplicates '''
+    if len(listOfElems) == len(set(listOfElems)):
+        return False
+    else:
+        return True
+
+samples = {}
+header = ""
+with open(samplefile, 'r') as f:
+    spamreader = csv.reader(f, delimiter = ",")
+    for line in spamreader:
+        header = line
+        break
+    for i in range(len(header)-1):
+        with open(samplefile, 'r') as f:
+            spamreader = csv.reader(f, delimiter = ",")
+            x = 0
+            for line in spamreader:
+                if line != header :
+                    samples[header[i].lower(),x] = line[i]
+                    x = x + 1
+
+# on récupère la liste des traitements et des fastq_name en wildcard
+treatments = []
+sample_name = []
+for key in samples:
+    if key[0] == "treatment":
+        treatments.append(samples[key])
+    if key[0] == "samplename":
+        sample_name.append(samples[key])
+TREATMENT = unique(list(treatments))
+
+SAMPLE_NAME = unique(list(sample_name))
+
+################################
+
+# Récuperation des fastq_path
+def get_fastq(wildcards):
+    for key in samples:
+        if key[0] == "samplename" and samples[key] == wildcards.fastq:
+            row = key[1]
+            for key1 in samples:
+                if key1[0] == "filename":
+                    if row == key1[1]:
+                        return f"{samples[key1]}"
+
+##############################
+# --- Main Build Rules --- #
 rule final:
-     input:
-          out_fastqc = expand(f"{FASTQC_DIR}{{reads}}_fastqc.html", reads = READS),
-          out_fastqs = expand(f"{FASTQSCREEN_DIR}{{reads}}_screen.html", reads = READS),
-          out_fastp = expand(f"{FASTP_DIR}{{reads}}_report_fastp.html", reads = READS),
-          #out_fastqc_af = expand(f"{FASTQC_AF_DIR}{{reads}}_r1_paired_fastqc.html", reads = READS),
-          out_multiqc = expand(f"{MULTIQC_DIR}multiqc_report.html"),
-          out_hisat_map = expand(f"{MAPPINGH_DIR}{{reads}}_HISAT.bam" , reads = READS),
-          out_star_map = expand(f"{MAPPINGS_DIR}{{reads}}Aligned.sortedByCoord.out.bam" , reads = READS),
-          out_bam_sort = expand(f"{BAM_DIR}{{reads}}_STAR_sort.bam", reads = READS),
-          out_bam_filt = expand(f"{FILTER_DIR}{{reads}}_STAR_sort_mapped.bam", reads = READS),
-          out_bam_index = expand(f"{BAM_DIR}{{reads}}_STAR_sort.bam.bai", reads = READS),
-          out_bam_stats = expand(f"{STATS_DIR}{{reads}}_STAR_sort_flagstat.txt", reads = READS),
-          out_bam_md = expand(f"{DUPL_DIR}{{reads}}_HISAT_sort_mapped_markdup_metric.txt", reads = READS),
-          out_htseq = expand(f"{HTSEQ_DIR}HISAT/{{reads}}.txt", reads = READS),
-          #out_gtf_list = expand(f'{STRINGTIE_DIR}STRINGTIE_MERGE/STAR_gtf_list.txt'),
-          #out_stringtie = expand(f'{STRINGTIE_DIR}STRINGTIE_MERGE/STAR_stringtie_merged.gtf'),
-          out_stringtiecc = expand(f'{STRINGTIE_DIR}STAR/{{reads}}/{{reads}}.gtf', reads=READS),
-          #out_gtf_list = expand(f'{STRINGTIE_DIR}HISAT_gtf_list.txt'),
-          out_strg_list = expand(f'{STRINGTIE_DIR}HISAT_Stringtie_list.txt'),
-          out_csv = expand(f'{STRINGTIE_DIR}HISAT_transcript_count_matrix.csv')
-
-
-# ----------------------------------- QUALITY -------------------------------------------------------------------
-# FastQC before filtering
-rule fastqc:
-     """ 
-          FastQC - Control Quality of reads
-     """
-     threads:4
-     params:
-        out_fastqc=directory(f"{FASTQC_DIR}"),
-     input:
-        r1 = f"{READS_DIR}{{reads}}.fastq.gz"
-     output:
-        out_fastqc_r1 = f"{FASTQC_DIR}{{reads}}_fastqc.html",
-        out_fastqc_r1_zip = f"{FASTQC_DIR}{{reads}}_fastqc.zip",
-     message:
-          """
-               input=
-                    r1 = {input.r1}
-               threads={threads}
-          """
-     conda:
-        "envs/quality.yaml"
-     shell:
-          """
-               fastqc -o {params.out_fastqc} -t 4 {input.r1}
-          """
-
-# FastQScreen agaisnt 3D7 and human
-rule fastqscreen:
-     """ 
-          FastQScreen - Control Quality of reads
-     """
-     threads:4
-     params:
-        out_fastqs=directory(f"{FASTQSCREEN_DIR}"),
-        fastqs_conf = f"{fastQScreen_conf}"
-     input:
-        fastqc= rules.fastqc.output.out_fastqc_r1_zip,
-        r1 = f"{READS_DIR}{{reads}}.fastq.gz",
-     output:
-        html_r1= f"{FASTQSCREEN_DIR}{{reads}}_screen.html",
-        txt_r1=f"{FASTQSCREEN_DIR}{{reads}}_screen.txt",
-     message:
-          """
-               Execute {rule}
-               input=
-                    r1 = {input.r1}
-               threads={threads}
-          """
-     conda:
-        "envs/quality.yaml"
-     shell:
-          """
-               fastq_screen --conf {params.fastqs_conf} --aligner BOWTIE2 {input.r1} --outdir {params.out_fastqs}
-          """
-
-# Filtering and trimming with FastP
-rule fastp:
-     """ 
-          FastP - Filtering and trimming before mapping
-     """
-     params:
-        out_fastp=directory(f"{FASTP_DIR}"),
-     input:
-        fastqc = rules.fastqc.output.out_fastqc_r1_zip,
-        r1 = f"{READS_DIR}{{reads}}.fastq.gz",
-     output:
-        out_r1 = f"{FASTP_DIR}{{reads}}_fastp.fastq.gz",
-        out_report= f"{FASTP_DIR}{{reads}}_report_fastp.html",
-        out_json= f"{FASTP_DIR}{{reads}}_fastp.json"
-
-     message:
-        """
-            Execute {rule}
-               input=
-                    r1 = {input.r1}
-        """
-     conda:
-        "envs/quality.yaml"
-     shell:
-          """
-               fastp -i {input.r1} -o {output.out_r1} -h {output.out_report} -j {output.out_json}  
-          """
-
-# FastQC after filtering
-rule fastqc_af:
-     """ 
-          FastQC - Control Quality of reads after FastP
-     """
-     params:
-        out_fastqc_af = directory(f"{FASTQC_AF_DIR}"),
-     input:
-        r1 = rules.fastp.output.out_r1,
-     output:
-        out_fastqc_af_r1 = f"{FASTQC_AF_DIR}{{reads}}_paired_fastqc.html",
-        out_fastqc_af_r1_zip = f"{FASTQC_AF_DIR}{{reads}}_paired_fastqc.zip",
-     message:
-          """
-            Execute {rule}
-               input=
-                    r1 = {input.r1}
-          """
-     conda:
-        "envs/quality.yaml"
-     shell:
-          """
-               fastqc -o {params.out_fastqc_af} -t 4 {input.r1}
-          """
-
-# FastQScreen agaisnt 3D7 and human
-rule multi_qc:
     """
-    MultiQC
+    construct a table of all resume files
     """
-    params:
-        out_multi = directory(f"{MULTIQC_DIR}"),
     input:
-        expand(f"{FASTQSCREEN_DIR}{{reads}}_screen.html", reads = READS),
-        expand(f"{FASTQSCREEN_DIR}{{reads}}_screen.txt", reads = READS),
-        expand(f"{FASTQC_DIR}{{reads}}_fastqc.html", reads=READS),
-        expand(f"{FASTQC_DIR}{{reads}}_fastqc.zip", reads=READS),
-        expand(f"{FASTQC_AF_DIR}{{reads}}_paired_fastqc.html", reads=READS),
-        expand(f"{FASTQC_AF_DIR}{{reads}}_paired_fastqc.zip", reads=READS),
-        expand(f"{FASTP_DIR}{{reads}}_report_fastp.html", reads=READS),
-        expand(f"{FASTP_DIR}{{reads}}_fastp.json",reads=READS)
-    output:
-        f"{MULTIQC_DIR}multiqc_report.html",
-    conda:
-        "envs/quality.yaml"
-    shell:
-        """
-             multiQC {input} -o {params.out_multi}
-        """
+        unpack(final_return)
 
-# ----------------------------------- MAPPING -------------------------------------------------------------------
-# Indexing of 3D7 genome (environ 1 min)
+
+# ------------- ----------------------------------------- 1 QC:
+
+rule run_Fastqc:
+    """
+        QC of fastq files on raw fastq files
+    """
+    threads: get_threads("run_Fastqc", 1)
+    input:
+        fastq = get_fastq
+    output:
+        html_fastqc = f"{out_dir}/1_QC/fastqc/{{fastq}}_raw_fastqc.html"
+    log:
+        error = f"{log_dir}/run_Fastqc/{{fastq}}.e",
+        output = f"{log_dir}/run_Fastqc/{{fastq}}.o"
+    conda:
+            "envs/quality.yaml"
+    shell:
+         """
+         fastqc -o {out_dir}/1_QC/fastqc -t {threads} {input.fastq}
+         infilename=$(basename {input.fastq})
+         fastqcOutFilePath="{out_dir}/1_QC/fastqc/${{infilename%%.*}}"_fastqc.html
+         finalOutFilePath="{output.html_fastqc}"
+         ## RUN ONLY IF SOURCE AND DEST ARE DIFFERENT PATHS
+         [[ "$fastqcOutFilePath" == "$finalOutFilePath" ]] || mv "$fastqcOutFilePath" "$finalOutFilePath"
+         """
+
+# --------------------- 1 MAPPING
+
 rule hisat2_index:
     """                                                                                                                                                                                       
     Make index with HISAT2 for 3D7                                                                                                                                                 
     """
+    threads: get_threads('bwa_index', 1)
     input:
-        fasta = f"{FASTA_REF}"
+        reference = reference_path,
     output:
-        index = f"{INDEX_DIR}{name_hisat_index}",
+        index = f"{reference_path}{name_hisat_index}",
     message:
         """                                                                                                                                                                                   
         Execute {rule}                                                                                                                                                                    
         input:                                                                                                                                                                            
-            fasta : {input.fasta}                                                                                                                                                       
+            reference : {input.reference}                                                                                                                                                       
         output:                                                                                                                                                                           
             index: {output.index}                                                                                                                     
         """
     log:
-        output = f"{INDEX_DIR}LOG/{name_hisat_index}_HISAT-INDEX.o",
-        error = f"{INDEX_DIR}LOG/{name_hisat_index}_HISAT-INDEX.e",
+        error = f"{log_dir}/{name_hisat_index}_HISAT-INDEX.e",
+        output = f"{log_dir}/{name_hisat_index}_HISAT-INDEX.o",
+
     conda:
         "envs/hisat2.yaml"
     shell:
         """
-        ln -s {input.fasta} {output.index} 1>{log.output} 2>{log.error}
-        hisat2-build {input.fasta} {output.index} --quiet
+        ln -s {input.reference} {output.index} 1>{log.output} 2>{log.error}
+        hisat2-build {input.reference} {output.index} --quiet
         """
 
 # Mapping with HISAT2 on Pf 3D7 (max 2 min par échantillon, total 10 min)
 rule hisat2_map:
     """
-    Map reads on the genome with HISAT2 on paired end
+    Map reads on the genome with HISAT2 on single end
     """
     threads: 4
     input:
         reference = rules.hisat2_index.output.index,
-        r1 = rules.fastp.output.out_r1,
+        r1 = get_fastq,
     output:
-        summary = f"{MAPPINGH_DIR}{{reads}}_HISAT_summary.txt",
-        bam = f"{MAPPINGH_DIR}{{reads}}_HISAT.bam",
+        summary = f"{out_dir}/2_mapping/{{fastq}}_HISAT_summary.txt",
+        bam = f"{out_dir}/2_mapping/{{fastq}}_HISAT.bam",
     message:
         """                                                                                                                                                                            
         Execute {rule}                                                                                                                                                                   
@@ -250,71 +239,7 @@ rule hisat2_map:
         "envs/hisat2.yaml"
     shell:
         """
-        hisat2 -p {threads} -x {input.reference} -u {input.r1} --summary-file {output.summary} | samtools view -S -b >{output.bam} 
-        """
-
-
-#Indexing for RNA-STAR (environ 2 min)
-rule star_index:
-    """
-    Make index with STAR
-    """
-    threads: 4
-    params:
-        dir = directory(f"{INDEX_STAR_DIR}")
-    input:
-        fasta = f"{FASTA_REF}",
-        gtf = f"{GTF_REF}",
-    output:
-        index = f"{INDEX_STAR_DIR}Log.out",
-    message:
-        """
-        Execute {rule}
-        input:
-            fasta : {input.fasta}
-            gtf : {input.gtf}
-        output:
-            index: {output.index}
-        """
-    conda:
-        "envs/Star.yaml"
-    shell:
-        """
-        ln -s {input.fasta} {output.index}
-        STAR --runMode genomeGenerate --runThreadN {threads} --genomeDir {params.dir} --genomeFastaFiles {input.fasta} --sjdbGTFfile {input.gtf}
-        """
-
-#Mapping with RNA-STAR on Pf 3D7 (environ 10 min par échantillon, total 1h)
-rule star_mapping:
-    """
-    Map reads on the genome with STAR on paired end
-    """
-    threads: 4
-    params:
-        idx = directory(f"{INDEX_STAR_DIR}"),
-        bam = f"{MAPPINGS_DIR}{{reads}}"
-    input:
-        idx = rules.star_index.output.index,
-        gtf = f"{GTF_REF}",
-        r1 = rules.fastp.output.out_r1
-    output:
-        bam = f"{MAPPINGS_DIR}{{reads}}Aligned.sortedByCoord.out.bam"
-    message:
-        """
-        Execute {rule}
-        input:
-            idx : {params.idx}
-            gtf : {input.gtf}
-            reads : 
-                r1: {input.r1}
-        output:
-            bam: {output.bam}
-        """
-    conda:
-        "envs/Star.yaml"
-    shell:
-        """
-        STAR --runThreadN 4 --genomeDir {params.idx} --readFilesIn {input.r1} --readFilesCommand gunzip -c --outFileNamePrefix {params.bam} --outSAMtype BAM SortedByCoordinate --sjdbGTFfile {input.gtf} 
+        hisat2 -p {threads} -x {input.reference} -U {input.r1} --summary-file {output.summary} | samtools view -S -b > {output.bam} 
         """
 
 #Sort the BAM files with samtools
@@ -324,185 +249,106 @@ rule bam_sort:
     """
     threads: 4
     input:
-        star =f'{MAPPINGS_DIR}{{reads}}Aligned.sortedByCoord.out.bam',
-        hisat = f"{MAPPINGH_DIR}{{reads}}_HISAT.bam"
+        hisat=rules.hisat2_map.output.bam
     output:
-        out_star = f"{BAM_DIR}{{reads}}_STAR_sort.bam",
-        out_hisat = f"{BAM_DIR}{{reads}}_HISAT_sort.bam"
+        out_hisat=f"{out_dir}/2_mapping/{{fastq}}_HISAT_sort.bam",
+        mapped_hisat=f"{out_dir}/2_mapping/{{fastq}}_HISAT_sort_mapped.bam",
+        unmapped_hisat=f"{out_dir}/2_mapping/{{fastq}}_HISAT_sort_unmapped.bam",
+        bai=f"{out_dir}/2_mapping/{{fastq}}_HISAT_sort.bam.bai",
+        bai_mapped=f"{out_dir}/2_mapping/{{fastq}}_HISAT_sort_mapped.bam.bai"
     message:
         """
         Execute {rule}
         input:
-            star : {input.star}
             hisat : {input.hisat}
         output:
-            bam: {output.out_star}, {output.out_hisat}
+            bam: {output.out_hisat}
+            mapped_bam: {output.mapped_hisat}
         """
     conda:
         "envs/samtools.yaml"
     shell:
         """
-        samtools sort  {input.star} > {output.out_star};
         samtools sort  {input.hisat} > {output.out_hisat}
+        samtools index {output.out_hisat}
+        samtools view -b -F 4 {output.out_hisat} > {output.mapped_hisat}
+        samtools view -b -f 4 {output.out_hisat} > {output.unmapped_hisat}
+        samtools index {output.mapped_hisat}
         """
 
-#Filtering of the BAM files with samtools
-rule bam_filter:
+
+rule generate_bamfile_info:
     """
-    Filtering BAM files      
+        generate_bamfile_info + bamlist for each treatment (to be use for samtools merge by treatment)
     """
-    threads: 4
+    threads: get_threads('generate_bamfile_info', 1)
     input:
-        star_bam = f"{BAM_DIR}{{reads}}_STAR_sort.bam",
-        hisat_bam = f"{BAM_DIR}{{reads}}_HISAT_sort.bam"
+        bam_files = expand(rules.bam_sort.output.mapped_hisat, fastq = SAMPLE_NAME),
+        samplefile = samplefile
+    params:
+        outdir = f"{out_dir}/2_mapping/"
     output:
-        mapped_star = f"{FILTER_DIR}{{reads}}_STAR_sort_mapped.bam",
-        unmapped_star = f"{FILTER_DIR}{{reads}}_STAR_sort_unmapped.bam",
-        mapped_hisat = f"{FILTER_DIR}{{reads}}_HISAT_sort_mapped.bam",
-        unmapped_hisat = f"{FILTER_DIR}{{reads}}_HISAT_sort_unmapped.bam"
-    message:
-        """
-        Execute {rule}
-            input: {input}
-        
-        """
-    conda:
-        "envs/samtools.yaml"
-    shell:
-        """
-        samtools view -b -F 4 {input.star_bam} > {output.mapped_star}
-        samtools view -b -f 4 {input.star_bam} > {output.unmapped_star}
-        samtools view -b -F 4 {input.hisat_bam} > {output.mapped_hisat}
-        samtools view -b -f 4 {input.hisat_bam} > {output.unmapped_hisat}
-        """
+        out_file = f"{out_dir}/2_mapping/bamfile_info.txt"
+    script:
+        "scripts/write_bamfile_info.py"
 
-# Identify the duplicates in BAM with Picard tools
-rule bam_markdup:
+
+rule samtools_stats:
     """
-    Mark duplicates in BAM files      
+        make stats on mappings
     """
-    threads: 4
+    threads: get_threads('samtools_stats', 1)
     input:
-         bam_star=f"{FILTER_DIR}{{reads}}_STAR_sort_mapped.bam",
-         bam_hisat = f"{FILTER_DIR}{{reads}}_HISAT_sort_mapped.bam",
+            sorted_bam_file = rules.bam_sort.output.out_hisat,
+            sorted_bam_index = rules.bam_sort.output.bai
     output:
-        star = f"{DUPL_DIR}{{reads}}_STAR_sort_mapped_markdup.bam",
-        star_txt = f"{DUPL_DIR}{{reads}}_STAR_sort_mapped_markdup_metric.txt",
-        hisat = f"{DUPL_DIR}{{reads}}_HISAT_sort_mapped_markdup.bam",
-        hisat_txt = f"{DUPL_DIR}{{reads}}_HISAT_sort_mapped_markdup_metric.txt"
+            bamstats = f"{out_dir}/2_mapping/{{fastq}}_HISAT_sort.bam.bamStats.txt",
+            idxstats = f"{out_dir}/2_mapping/{{fastq}}_HISAT_sort.bam.idxstats.log",
+            flagstat = f"{out_dir}/2_mapping/{{fastq}}_HISAT_sort.bam.flagstat.log"
+    log:
+            error = f"{log_dir}/samtools_stats/{{fastq}}.e",
+            output = f"{log_dir}/samtools_stats/{{fastq}}.o"
     message:
-        """
-        Execute {rule}
-        input: {input}
-        """
+            f"""
+            {sep*108}
+            Execute {{rule}} for
+                Input:
+                    - sorted_bam_file : {{input.sorted_bam_file}}
+                Output:
+                    - bam stats : {{output.bamstats}}
+                Others
+                    - Threads : {{threads}}
+                    - LOG error: {{log.error}}
+                    - LOG output: {{log.output}}
+            {sep*108}"""
     conda:
-        "envs/picard.yaml"
+            "envs/samtools.yaml"
     shell:
-        """
-        java -jar picard.jar MarkDuplicates I={input.bam_star} O={output.star} M={output.star_txt}
-        java -jar picard.jar MarkDuplicates I={input.bam_hisat} O={output.hisat} M={output.hisat_txt}
-        """
+            """
+                samtools stats {input.sorted_bam_file} > {input.sorted_bam_file}.bamStats.txt 2>>{log.error}
+                samtools idxstats --threads {threads} {input.sorted_bam_file} > {input.sorted_bam_file}.idxstats.log 2>>{log.error}
+                samtools flagstat --threads {threads} {input.sorted_bam_file} > {input.sorted_bam_file}.flagstat.log 2>>{log.error}
+            """
 
-#Index the BAM files with samtools
-rule bam_index:
+rule multiqc:
     """
-    Index BAM files      
+        multiqc on outdir directory
     """
-    threads: 4
+    threads: get_threads("multiqc", 1)
     input:
-        bam_star = f"{BAM_DIR}{{reads}}_STAR_sort.bam",
-        bam_hisat = f"{BAM_DIR}{{reads}}_HISAT_sort.bam",
-        bam_star_filt = f"{FILTER_DIR}{{reads}}_STAR_sort_mapped.bam",
-        bam_hisat_filt =f"{FILTER_DIR}{{reads}}_HISAT_sort_mapped.bam",
-        bam_star_filt_md = f"{DUPL_DIR}{{reads}}_STAR_sort_mapped_markdup.bam",
-        bam_hisat_filt_md = f"{DUPL_DIR}{{reads}}_HISAT_sort_mapped_markdup.bam",
+        expand(f"{out_dir}/1_QC/fastqc/{{fastq}}_raw_fastqc.html", fastq = SAMPLE_NAME),
+        expand(f"{out_dir}/2_mapping/{{fastq}}_HISAT_sort.bam.bamStats.txt", fastq = SAMPLE_NAME),
+        expand(f"{out_dir}/2_mapping/{{fastq}}_HISAT_sort.bam.idxstats.log", fastq = SAMPLE_NAME),
+        expand(f"{out_dir}/2_mapping/{{fastq}}_HISAT_sort.bam.flagstat.log", fastq = SAMPLE_NAME),
     output:
-        bai = f"{BAM_DIR}{{reads}}_STAR_sort.bam.bai"
-    message:
-        """
-        Execute {rule}
-            input: {input}
-        """
-    conda:
-        "envs/samtools.yaml"
-    shell:
-        """
-        samtools index {input.bam_star}
-        samtools index {input.bam_hisat}
-        samtools index {input.bam_star_filt}
-        samtools index {input.bam_hisat_filt}
-        samtools index {input.bam_star_filt_md}
-        samtools index {input.bam_hisat_filt_md}
-        """
+        f"{out_dir}/6_MULTIQC/multiqc.html"
+    log:
+        f"{log_dir}/multiqc/multiqc.log"
+    wrapper:
+        "0.80.2/bio/multiqc"
 
-#Stats on the BAM files with samtools
-rule bam_stats:
-    """
-    Statistics data on the BAM files      
-    """
-    threads: 4
-    input:
-        bam_star = f"{BAM_DIR}{{reads}}_STAR_sort.bam",
-        bam_hisat = f"{BAM_DIR}{{reads}}_HISAT_sort.bam",
-        bam_star_filt = f"{FILTER_DIR}{{reads}}_STAR_sort_mapped.bam",
-        bam_hisat_filt =f"{FILTER_DIR}{{reads}}_HISAT_sort_mapped.bam",
-        bam_star_filt_md = f"{DUPL_DIR}{{reads}}_STAR_sort_mapped_markdup.bam",
-        bam_hisat_filt_md = f"{DUPL_DIR}{{reads}}_HISAT_sort_mapped_markdup.bam",
-    output:
-        flagstat_star = f"{STATS_DIR}{{reads}}_STAR_sort_flagstat.txt",
-        flagstat_hisat = f"{STATS_DIR}{{reads}}_HISAT_sort_flagstat.txt",
-        flagstat_star_filt= f"{STATS_DIR}{{reads}}_STAR_sort_mapped_flagstat.txt",
-        flagstat_hisat_filt = f"{STATS_DIR}{{reads}}_HISAT_sort_mapped_flagstat.txt",
-        flagstat_star_filt_md= f"{STATS_DIR}{{reads}}_STAR_sort_mapped_markdup_flagstat.txt",
-        flagstat_hisat_filt_md= f"{STATS_DIR}{{reads}}_HISAT_sort_mapped_markdup_flagstat.txt",
-    message:
-        """
-        Execute {rule}
-            input: {input}
-        """
-    conda:
-        "envs/samtools.yaml"
-    shell:
-        """
-        samtools flagstat {input.bam_star} > {output.flagstat_star}
-        samtools flagstat {input.bam_hisat} > {output.flagstat_hisat}
-        samtools flagstat {input.bam_star_filt} > {output.flagstat_star_filt}
-        samtools flagstat {input.bam_star_filt_md} > {output.flagstat_star_filt_md}
-        samtools flagstat {input.bam_hisat_filt} > {output.flagstat_hisat_filt}
-        samtools flagstat {input.bam_hisat_filt_md} > {output.flagstat_hisat_filt_md}
-        """
 
-# ----------------------------------- COUNT -------------------------------------------------------------------
-#Create the count table from the BAM files with HTseq count
-rule htseq_counts :
-    """
-    Create the count table with HTseq-count      
-    """
-    threads: 4
-    input:
-         bam_index = rules.bam_index.output.bai,
-         bam_star = f"{DUPL_DIR}{{reads}}_STAR_sort_mapped_markdup.bam",
-         bam_hisat = f"{DUPL_DIR}{{reads}}_HISAT_sort_mapped_markdup.bam",
-         gtf = f"{GTF_REF}"
-    output:
-         count_table_star = f"{HTSEQ_DIR}STAR/{{reads}}.txt",
-         count_table_hisat = f"{HTSEQ_DIR}HISAT/{{reads}}.txt"
-    message:
-        """
-        Execute {rule}
-        input: 
-            bam: {input.bam_star}
-            gtf: {input.gtf}
-        output: {output.count_table_star}
-        """
-    conda:
-        "envs/htseq.yaml"
-    shell:
-        """
-        htseq-count -t exon -i gene_id -f bam {input.bam_star} {input.gtf} > {output.count_table_star}
-        htseq-count -t exon -i gene_id -f bam {input.bam_hisat} {input.gtf} > {output.count_table_hisat}
-        """
-
+################ 3 comptage
 #Create the count table from the BAM files with stringtie
 rule stringtie :
     """
@@ -510,87 +356,84 @@ rule stringtie :
     """
     threads: 4
     input:
-         bam_index = rules.bam_index.output.bai,
-         bam_star = f"{DUPL_DIR}{{reads}}_STAR_sort_mapped_markdup.bam",
-         bam_hisat = f"{DUPL_DIR}{{reads}}_HISAT_sort_mapped_markdup.bam",
-         gtf = f"{GTF_REF}"
+         bam_index = rules.bam_sort.output.bai_mapped,
+         bam_hisat = rules.bam_sort.output.mapped_hisat,
+         gtf = f"{annotation_path}"
     output:
-         star_gtf = f'{STRINGTIE_DIR}STAR/{{reads}}/{{reads}}.gtf',
-         hisat_gtf= f'{STRINGTIE_DIR}HISAT/{{reads}}/{{reads}}.gtf',
-         star_tsv = f'{STRINGTIE_DIR}STAR/{{reads}}/{{reads}}.tsv',
-         hisat_tsv = f'{STRINGTIE_DIR}HISAT/{{reads}}/{{reads}}.tsv'
+         hisat_gtf= f'{out_dir}/3_count/STRINGTIE/{{fastq}}.gtf',
+         hisat_tsv = f'{out_dir}/3_count/STRINGTIE/{{fastq}}.tsv'
     message:
         """
         Execute {rule}
-        input:
-            bam: {input.bam_star}, {input.bam_hisat}
-            gtf: {input.gtf}
-        output: {output.star_tsv}
         """
     conda:
         "envs/stringtie.yaml"
     shell:
         """
-        stringtie -p 8 -G {input.gtf} -e -B -o {output.star_gtf} -A {output.star_tsv} {input.bam_star}
-        stringtie -p 8 -G {input.gtf} -e -B -o {output.hisat_gtf} -A {output.hisat_tsv} {input.bam_hisat}
+        stringtie -p 8 -e -B -G {input.gtf} -o {output.hisat_gtf} -A {output.hisat_tsv} {input.bam_hisat}
         """
+
 
 # Create a list of GTF created by Stringtie
 rule stringtie_gtf_list:
     threads : 1
     input:
-        list_gtf_star = expand(f'{STRINGTIE_DIR}STAR/{{reads}}/{{reads}}.gtf', reads = READS),
-        list_gtf_hisat = expand(f'{STRINGTIE_DIR}HISAT/{{reads}}/{{reads}}.gtf', reads = READS),
+        list_gtf_hisat = expand(f'{out_dir}/3_count/STRINGTIE/{{fastq}}.gtf', fastq = SAMPLE_NAME),
     output :
-        gtf_star = f'{STRINGTIE_DIR}STAR_gtf_list.txt',
-        gtf_hisat = f'{STRINGTIE_DIR}HISAT_gtf_list.txt',
+        gtf_hisat = f'{out_dir}/3_count/STRINGTIE/HISAT_gtf_list.txt',
     shell:
         """
-        find {input.list_gtf_star} >> {output.gtf_star}
         find {input.list_gtf_hisat} >> {output.gtf_hisat}
         """
 
+
 # Create a list with the ID sample and the path of the stringtie GTF
 rule list_for_prepDE:
-    input: rules.stringtie_gtf_list.output.gtf_star, rules.stringtie_gtf_list.output.gtf_star
+    input: rules.stringtie_gtf_list.output.gtf_hisat
     output:
-        star_list= f'{STRINGTIE_DIR}STAR_Stringtie_list.txt',
-        hisat_list= f'{STRINGTIE_DIR}HISAT_Stringtie_list.txt'
+        hisat_list= f'{out_dir}/3_count/STRINGTIE/HISAT_Stringtie_list.txt'
     run:
-        star_list_name_reads= open(output.star_list, "w")
         hisat_list_name_reads= open(output.hisat_list, "w")
-        star_gtf = open(rules.stringtie_gtf_list.output.gtf_star, "r")
         hisat_gtf = open(rules.stringtie_gtf_list.output.gtf_hisat, "r")
-        for i in range(len(READS)):
-            name= READS[i]
-            x=re.split("-", name)
-            ID = x[0]+"_"+x[2]
-            star_list_name_reads.write(ID + " " + star_gtf.readline())
-            hisat_list_name_reads.write(ID + " " + hisat_gtf.readline())
+        for i in range(len(SAMPLE_NAME)):
+            name=SAMPLE_NAME[i]
+            hisat_list_name_reads.write(name + " " + hisat_gtf.readline())
+
 
 # Convert the stringtie GTF to a count table
 rule prepDE_stringtie_table:
     threads : 1
     input :
-        mergelist_star = rules.list_for_prepDE.output.star_list,
         mergelist_hisat = rules.list_for_prepDE.output.hisat_list,
     output :
-        gcsv_star = f'{STRINGTIE_DIR}STAR_gene_count_matrix.csv',
-        tcsv_star = f'{STRINGTIE_DIR}STAR_transcript_count_matrix.csv',
-        gcsv_hisat = f'{STRINGTIE_DIR}HISAT_gene_count_matrix.csv',
-        tcsv_hisat = f'{STRINGTIE_DIR}HISAT_transcript_count_matrix.csv',
+        gcsv_hisat = f'{out_dir}/3_count/STRINGTIE/HISAT_gene_count_matrix.csv',
+        tcsv_hisat = f'{out_dir}/3_count/STRINGTIE/HISAT_transcript_count_matrix.csv',
     conda:
         "envs/stringtie.yaml"
     shell:
         """
-        python2 prepDE.py -i {input.mergelist_star} -t {output.tcsv_star} -g {output.gcsv_star}
-        python2 prepDE.py -i {input.mergelist_hisat} -t {output.tcsv_hisat} -g {output.gcsv_hisat}
-       """
+        prepDE.py -i {input.mergelist_hisat} -t {output.tcsv_hisat} -g {output.gcsv_hisat}
+        """
 
-# pseudo count:
-
-rule Kalisto:
-
-
-
-
+rule diff_exp_analysis:
+    """
+       Experimental sRNA Clusters Differential Expression Analysis
+    """
+    threads: get_threads('diff_exp_analysis',4)
+    input:
+        gcsv_hisat=rules.prepDE_stringtie_table.output.gcsv_hisat,
+        sample_info=config["DATA"]["files"]["sample_info"],
+        de_comparisons_file=config["DATA"]["files"]["de_comparisons_file"],
+    params:
+        out_dir = lambda w, output: os.path.dirname(output.html_output),
+        normCount= f"{out_dir}/4_DE_analysis/normcount.csv",
+        resDE= f"{out_dir}/4_DE_analysis/resDE.csv",
+    output:
+        html_output = f"{out_dir}/4_DE_analysis/edger.html",
+    log:
+        error = f"{log_dir}/diff_exp_analysis.e",
+        output = f"{log_dir}/diff_exp_analysis.o"
+    singularity:
+        config["SINGULARITY"]["MAIN"]
+    script:
+        "scripts/edger.Rmd"

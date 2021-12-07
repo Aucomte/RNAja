@@ -5,4 +5,4 @@ channels:
     - defaults
     - anaconda
 dependencies:
-    - stringtie=2.1.4
+    - stringtie=2.1.7
