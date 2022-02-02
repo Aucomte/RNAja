@@ -47,29 +47,29 @@ suppressMessages(library('Rsubread', warn.conflict = FALSE, quietly = TRUE))
 #opts_knit$set(root.dir = snakemake@params[["out_dir"]])
 
 ##################### LOADING PARAMS FROM SNAKEMAKE OBJECT ######################
-#gcsv_hisat <- snakemake@input[["gcsv_hisat"]]
-#sample_info <- snakemake@input[["sample_info"]]
-#comparaisons_file <- snakemake@input[["de_comparisons_file"]]
-#gtf_file <- snakemake@input[["gtf_file"]]
+gcsv_hisat <- snakemake@input[["gcsv_hisat"]]
+sample_info <- snakemake@input[["sample_info"]]
+comparaisons_file <- snakemake@input[["de_comparisons_file"]]
+gtf_file <- snakemake@input[["gtf_file"]]
 
-#outDir <- snakemake@params[["out_dir"]]
-#invisible(dir.exists(outDir) || dir.create(path = outDir, mode = "770"))
+outDir <- snakemake@params[["out_dir"]]
+invisible(dir.exists(outDir) || dir.create(path = outDir, mode = "770"))
 
-#normCount_file <- snakemake@params[["normCount"]]
-#counts_file <- snakemake@params[["Counts"]]
-#resDE_file <- snakemake@params[["resDE"]]
+normCount_file <- snakemake@params[["normCount"]]
+counts_file <- snakemake@params[["Counts"]]
+resDE_file <- snakemake@params[["resDE"]]
 
 #########################################################################
 
-gcsv_hisat <- "/home/comtea/Documents/PHIM/BURKADAPT/ProjetTuteur-_BulkRNA/output/3_count/STRINGTIE/HISAT_gene_count_matrix.csv"
-sample_info <- "/home/comtea/Documents/PHIM/BURKADAPT/ProjetTuteur-_BulkRNA/DATA/sample_info.txt"
-comparaisons_file <- "/home/comtea/Documents/PHIM/BURKADAPT/ProjetTuteur-_BulkRNA/DATA/treatmentsComparisons.csv"
-outDir <- "/home/comtea/Documents/PHIM/BURKADAPT/ProjetTuteur-_BulkRNA/test"
-invisible(dir.exists(outDir) || dir.create(path = outDir, mode = "770"))
-normCount_file <- "/home/comtea/Documents/PHIM/BURKADAPT/ProjetTuteur-_BulkRNA/test/normCounts"
-counts_file <- "/home/comtea/Documents/PHIM/BURKADAPT/ProjetTuteur-_BulkRNA/test/Counts"
-resDE_file <- "/home/comtea/Documents/PHIM/BURKADAPT/ProjetTuteur-_BulkRNA/test/resde"
-gtf_file="/home/comtea/Documents/PHIM/BURKADAPT/ProjetTuteur-_BulkRNA/DATA/ref/msu7.gtf"
+#gcsv_hisat <- "/home/comtea/Documents/PHIM/BURKADAPT/ProjetTuteur-_BulkRNA/output/3_count/STRINGTIE/HISAT_gene_count_matrix.csv"
+#sample_info <- "/home/comtea/Documents/PHIM/BURKADAPT/ProjetTuteur-_BulkRNA/DATA/sample_info.txt"
+#comparaisons_file <- "/home/comtea/Documents/PHIM/BURKADAPT/ProjetTuteur-_BulkRNA/DATA/treatmentsComparisons.csv"
+#outDir <- "/home/comtea/Documents/PHIM/BURKADAPT/ProjetTuteur-_BulkRNA/test"
+#invisible(dir.exists(outDir) || dir.create(path = outDir, mode = "770"))
+#normCount_file <- "/home/comtea/Documents/PHIM/BURKADAPT/ProjetTuteur-_BulkRNA/test/normCounts"
+#counts_file <- "/home/comtea/Documents/PHIM/BURKADAPT/ProjetTuteur-_BulkRNA/test/Counts"
+#resDE_file <- "/home/comtea/Documents/PHIM/BURKADAPT/ProjetTuteur-_BulkRNA/test/resde"
+#gtf_file="/home/comtea/Documents/PHIM/BURKADAPT/ProjetTuteur-_BulkRNA/DATA/ref/msu7.gtf"
 
 ```
 
