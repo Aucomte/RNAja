@@ -11,9 +11,7 @@ if "sphinx" in args:
 else:
     RNAJA_PATH = Path(__file__).resolve().parent
 RNAJA_SNAKEFILE = RNAJA_PATH.joinpath("snakefiles", "Snakefile")
-#CULEBRONT_MODE = CULEBRONT_PATH.joinpath(".mode.txt")
-#CULEBRONT_SCRIPTS = CULEBRONT_PATH.joinpath("snakemake_scripts")
-#CULEBRONT_PROFILE = CULEBRONT_PATH.joinpath("default_profile")
+RNAJA_SCRIPTS = RNAJA_PATH.joinpath("scripts")
 RNAJA_CONFIG_PATH = RNAJA_PATH.joinpath("install_files", "config.yaml")
 
 #SINGULARITY_URL_FILES = [('https://itrop.ird.fr/culebront_utilities/singularity_build/Singularity.culebront_tools.sif',

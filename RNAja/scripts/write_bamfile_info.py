@@ -36,6 +36,8 @@ with open(samplefile, 'r') as f:
                     samples[header[i].lower(),x] = line[i]
                     x = x + 1
 
+num = x
+
 #on récupère la liste des traitements
 treatments = []
 for key in samples:
@@ -52,39 +54,11 @@ for x in samples:
 with open(bamfile, 'w') as f:
     writer = csv.writer(f, delimiter = ",")
     writer.writerow(header)
-    for i in range(len(header)):
+    #for i in range(len(header)):
+    for i in range(num):
         for key in samples.keys():
             if key[1] == i:
                 f.write(f"{samples[key]},")
         f.write(f"\n")
-
-####################################
-## ecrire les listes de bam par traitement
-
-for treatment in TREATMENT:
-    samples = {}
-    header = ""
-    with open(bamfile, 'r') as f:
-        spamreader = csv.reader(f, delimiter = ",")
-        for line in spamreader:
-            header = line
-            break
-        for i in range(len(header)-1):
-            with open(bamfile, 'r') as f:
-                spamreader = csv.reader(f, delimiter = ",")
-                x = 0
-                for line in spamreader:
-                    if line != header :
-                        samples[header[i].lower(),x] = [line[i]]
-                        x = x + 1
-        l = list()
-        for key in samples:
-            if key[0].lower() == "treatment":
-                if samples[key][0] == treatment:
-                    l.append(samples["filename", key[1]][0])
-        treatmentfile = f"{outdir}List_bamfiles_{treatment}"
-        with open(treatmentfile, 'w') as f:
-            for key in l:
-                f.write(f"{key}\n")
 
 time.sleep(10)

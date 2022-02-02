@@ -1,5 +1,7 @@
 import re, sys, glob, os, csv, pprint
 import pandas as pd
+from RNAja.global_variable import *
+import RNAja
 from pathlib import Path
 from snakemake import WorkflowError
 #from snakemake import load_configfile
@@ -171,8 +173,8 @@ rule run_Fastqc:
     log:
         error = f"{log_dir}/run_Fastqc/{{fastq}}.e",
         output = f"{log_dir}/run_Fastqc/{{fastq}}.o"
-    conda:
-            "envs/quality.yaml"
+    singularity:
+        config["SINGULARITY"]["MAIN"]
     shell:
          """
          fastqc -o {out_dir}/1_QC/fastqc -t {threads} {input.fastq}
@@ -205,9 +207,8 @@ rule hisat2_index:
     log:
         error = f"{log_dir}/{name_hisat_index}_HISAT-INDEX.e",
         output = f"{log_dir}/{name_hisat_index}_HISAT-INDEX.o",
-
-    conda:
-        "envs/hisat2.yaml"
+    singularity:
+        config["SINGULARITY"]["MAIN"]
     shell:
         """
         ln -s {input.reference} {output.index} 1>{log.output} 2>{log.error}
@@ -235,8 +236,8 @@ rule hisat2_map:
         output:                                                                                                                                                                           
             bam: {output.bam}                                                                                                 
         """
-    conda:
-        "envs/hisat2.yaml"
+    singularity:
+        config["SINGULARITY"]["MAIN"]
     shell:
         """
         hisat2 -p {threads} -x {input.reference} -U {input.r1} --summary-file {output.summary} | samtools view -S -b > {output.bam} 
@@ -265,8 +266,8 @@ rule bam_sort:
             bam: {output.out_hisat}
             mapped_bam: {output.mapped_hisat}
         """
-    conda:
-        "envs/samtools.yaml"
+    singularity:
+        config["SINGULARITY"]["MAIN"]
     shell:
         """
         samtools sort  {input.hisat} > {output.out_hisat}
@@ -290,7 +291,7 @@ rule generate_bamfile_info:
     output:
         out_file = f"{out_dir}/2_mapping/bamfile_info.txt"
     script:
-        "scripts/write_bamfile_info.py"
+        f"{RNAja.RNAJA_SCRIPTS}/write_bamfile_info.py"
 
 
 rule samtools_stats:
@@ -321,8 +322,8 @@ rule samtools_stats:
                     - LOG error: {{log.error}}
                     - LOG output: {{log.output}}
             {sep*108}"""
-    conda:
-            "envs/samtools.yaml"
+    singularity:
+        config["SINGULARITY"]["MAIN"]
     shell:
             """
                 samtools stats {input.sorted_bam_file} > {input.sorted_bam_file}.bamStats.txt 2>>{log.error}
@@ -366,8 +367,8 @@ rule stringtie :
         """
         Execute {rule}
         """
-    conda:
-        "envs/stringtie.yaml"
+    singularity:
+        config["SINGULARITY"]["MAIN"]
     shell:
         """
         stringtie -p 8 -e -B -G {input.gtf} -o {output.hisat_gtf} -A {output.hisat_tsv} {input.bam_hisat}
@@ -408,8 +409,8 @@ rule prepDE_stringtie_table:
     output :
         gcsv_hisat = f'{out_dir}/3_count/STRINGTIE/HISAT_gene_count_matrix.csv',
         tcsv_hisat = f'{out_dir}/3_count/STRINGTIE/HISAT_transcript_count_matrix.csv',
-    conda:
-        "envs/stringtie.yaml"
+    singularity:
+        config["SINGULARITY"]["MAIN"]
     shell:
         """
         prepDE.py -i {input.mergelist_hisat} -t {output.tcsv_hisat} -g {output.gcsv_hisat}
@@ -438,4 +439,4 @@ rule diff_exp_analysis:
     singularity:
         config["SINGULARITY"]["MAIN"]
     script:
-        "scripts/edger.Rmd"
+        f"{RNAja.RNAJA_SCRIPTS}/edger.Rmd"
