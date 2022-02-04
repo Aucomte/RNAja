@@ -2,7 +2,7 @@
 # Input output data options
 'DATA':
     'directories':
-        'out_dir': "output"       # Out directory
+        'out_dir': "output2"       # Out directory
     'files':
         'reference': "DATA/ref/allcon.fasta"
         'annotation': "DATA/ref/msu7.gtf"
@@ -13,4 +13,4 @@
 # Location of various software
 
 SINGULARITY:
-    "MAIN": "envs/Singularity.R.simg"
+    "MAIN": "RNAja/envs/Singularity.RNAja.sif"

@@ -59,7 +59,7 @@ def main():
         },
         entry_points={
             'RNAja': ['RNAja = __init__'],
-            'console_scripts': [f'RNAja = RNAja.__init__:run_local']
+            'console_scripts': [f'RNAja = RNAja.main:main']
             },
 
         # Pypi information
