@@ -16,8 +16,5 @@
     'thres_FDR': 0.01
     'thres_logFC': 1.5
 
-##############################
-# Location of various software
-
 SINGULARITY:
     "MAIN": "RNAja/envs/Singularity.RNAja.sif"
