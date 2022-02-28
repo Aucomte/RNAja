@@ -101,12 +101,16 @@ conda install samtools=1.14 -n samtools
 conda create -n stringtie
 conda install stringtie=2.1.7 -n stringtie
 
+conda create -n gffcompare
+conda install -c bioconda gffcompare=0.11.2 -n gffcompare
+
 %environment
   export PATH="/opt/conda/bin:$PATH"
   export PATH="/opt/conda/envs/fastqc/bin:$PATH"
   export PATH="/opt/conda/envs/hisat2/bin:$PATH"
   export PATH="/opt/conda/envs/samtools/bin:$PATH"
   export PATH="/opt/conda/envs/stringtie/bin:$PATH"
+  export PATH="/opt/conda/envs/gffcompare/bin:$PATH"
 
 %runscript
 exec /bin/bash "$@"

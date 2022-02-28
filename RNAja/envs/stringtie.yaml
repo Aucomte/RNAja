@@ -1,8 +1,0 @@
-name: stringtie
-channels:
-    - bioconda
-    - conda-forge
-    - defaults
-    - anaconda
-dependencies:
-    - stringtie=2.1.7

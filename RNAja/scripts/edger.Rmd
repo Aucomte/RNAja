@@ -59,17 +59,23 @@ normCount_file <- snakemake@params[["normCount"]]
 counts_file <- snakemake@params[["Counts"]]
 resDE_file <- snakemake@params[["resDE"]]
 
+cutoff_cpm <- snakemake@params[["cutoff_cpm"]]
+cutoff_nb_echantillons <- snakemake@params[["cutoff_nb_echantillons"]]
+thres_FDR <- snakemake@params[["thres_FDR"]]
+thres_logFC <- snakemake@params[["thres_logFC"]]
 #########################################################################
-
-#gcsv_hisat <- "/home/comtea/Documents/PHIM/BURKADAPT/ProjetTuteur-_BulkRNA/output/3_count/STRINGTIE/HISAT_gene_count_matrix.csv"
-#sample_info <- "/home/comtea/Documents/PHIM/BURKADAPT/ProjetTuteur-_BulkRNA/DATA/sample_info.txt"
-#comparaisons_file <- "/home/comtea/Documents/PHIM/BURKADAPT/ProjetTuteur-_BulkRNA/DATA/treatmentsComparisons.csv"
-#outDir <- "/home/comtea/Documents/PHIM/BURKADAPT/ProjetTuteur-_BulkRNA/test"
+```
+```{r include=FALSE}
+#test
+#gcsv_hisat <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/output2/3_count/STRINGTIE/HISAT_gene_count_matrix.csv"
+#sample_info <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/DATA/sample_info.txt"
+#comparaisons_file <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/DATA/treatmentsComparisons.csv"
+#outDir <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/test"
 #invisible(dir.exists(outDir) || dir.create(path = outDir, mode = "770"))
-#normCount_file <- "/home/comtea/Documents/PHIM/BURKADAPT/ProjetTuteur-_BulkRNA/test/normCounts"
-#counts_file <- "/home/comtea/Documents/PHIM/BURKADAPT/ProjetTuteur-_BulkRNA/test/Counts"
-#resDE_file <- "/home/comtea/Documents/PHIM/BURKADAPT/ProjetTuteur-_BulkRNA/test/resde"
-#gtf_file="/home/comtea/Documents/PHIM/BURKADAPT/ProjetTuteur-_BulkRNA/DATA/ref/msu7.gtf"
+#normCount_file <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/test/normCounts"
+#counts_file <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/test/Counts"
+#resDE_file <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/test/resde"
+#gtf_file="/home/comtea/Documents/PHIM/BURKADAPT/RNAja/DATA/ref/msu7.gtf"
 
 ```
 
@@ -81,54 +87,26 @@ sampleInfo <- data.frame(fileName= pheno_data$SampleName, condition = pheno_data
 rawCountTable <- as.matrix(read.csv(gcsv_hisat,row.names="gene_id"))
 
 dgList <- DGEList(rawCountTable, group=sampleInfo$condition, genes=rownames(rawCountTable))
+# longueur des genes utile si on veut faire du RPKM :
 SAF <- Rsubread::flattenGTF(gtf_file)
 GeneLength <- rowsum(SAF$End-SAF$Start+1, SAF$GeneID)
 GeneLength <- as.matrix(GeneLength)
 dgList$genes$Length=GeneLength
 dgList$genes$Length = as.numeric(as.character(dgList$genes$Length))
 dgList
+summary(cpm(dgList))
 ```
-
-# exploration and QC
-
-
-```{r}
-pseudoCounts <- log2(dgList$counts+1)
-sampleDists <- as.matrix(dist(t(pseudoCounts)))
-
-#Boxplot for pseudo-counts
-boxplot(pseudoCounts, col="gray", las=3)
-
-```
-```{r}
-cimColor <- colorRampPalette(rev(brewer.pal(9, "Blues")))(16)
-#cim(sampleDists, color=cimColor, symkey=FALSE, zoom=TRUE)
-#cim(sampleDists, color=cimColor, symkey=FALSE, zoom=TRUE)
-mypalette <- brewer.pal(11,"RdYlBu")
-morecols <- colorRampPalette(mypalette)
-heatmap(sampleDists, col = morecols)
-```
-
-```{r}
-plotMDS(pseudoCounts)
-```
-
 # filtering
 
-First get rid of genes which did not occur frequently enough. We can choose this cutoff by saying we must have at least 100 counts per million (calculated with cpm() in R) on any particular gene that we want to keep. In this example, we're only keeping a gene if it has a cpm of 2 or greater for at least two samples.
+First get rid of genes which did not occur frequently enough. We can choose this cutoff by saying we must have at least 2 counts per million (calculated with cpm() in R) on any particular gene that we want to keep. In this example, we're only keeping a gene if it has a cpm of 2 or greater for at least two samples.
 
 ```{r}
 countsPerMillion <- cpm(dgList)
-countCheck <- countsPerMillion > 2
-keep <- which(rowSums(countCheck) >= 2)
+countCheck <- countsPerMillion > cutoff_cpm
+keep <- which(rowSums(countCheck) >= cutoff_nb_echantillons)
 dgList <- dgList[keep,]
 summary(cpm(dgList))
 ```
-
-# Normalisation
-
-it  is  important  to  normalize  RNA-seq  both  within  and  between  samples. edgeR implements the trimmed mean of M-values (TMM) method
-
 ```{r}
 dgList <- calcNormFactors(dgList, method="TMM")
 
@@ -140,11 +118,28 @@ write.table(dgList$counts,file=counts_file,sep=";")
 write.table(normCounts, file=normCount_file, sep=";")
 ```
 
+# exploration and QC
+
 ```{r}
-pseudoNormCounts <- log2(normCounts + 1)
-plotMDS(pseudoNormCounts)
+plotMDS(dgList)
 ```
 
+```{r}
+pseudoCounts <- log2(dgList$counts+1)
+sampleDists <- as.matrix(dist(t(pseudoCounts)))
+
+#Boxplot for pseudo-counts
+boxplot(pseudoCounts, col="gray", las=3)
+
+```
+```{r}
+cimColor <- colorRampPalette(rev(brewer.pal(9, "Blues")))(16)
+cim(sampleDists, color=cimColor, symkey=FALSE, zoom=FALSE)
+#cim(sampleDists, color=cimColor, symkey=FALSE, zoom=TRUE)
+#mypalette <- brewer.pal(11,"RdYlBu")
+#morecols <- colorRampPalette(mypalette)
+#heatmap(sampleDists, col = morecols)
+```
 
 # Differential expression analysis
 
@@ -154,6 +149,7 @@ plotMDS(pseudoNormCounts)
 dgList <- estimateCommonDisp(dgList)
 dgList <- estimateTagwiseDisp(dgList)
 dgList
+plotBCV(dgList)
 ```
 
 
@@ -188,9 +184,9 @@ for (lines in 1:nrow(comp)){
 
   cat("\n\nnumber of differencialy expressed genes (risk: 1%)\n\n")
 
-  sum(resNoFilt$table$FDR < 0.01)
+  sum(resNoFilt$table$FDR < thres_FDR)
   
-  sigDownReg <- resNoFilt$table[resNoFilt$table$FDR<0.01,]
+  sigDownReg <- resNoFilt$table[resNoFilt$table$FDR<thres_FDR,]
   sigDownReg <- sigDownReg[order(sigDownReg$logFC),]
    cat(knitr::knit_print((DT::datatable(sigDownReg))))
 
@@ -198,12 +194,12 @@ for (lines in 1:nrow(comp)){
   write.table(resNoFilt, file=resDE_file_name, sep=";")
 
   y <- cpm(dgList, log=TRUE, prior.count = 1)
-  selY <- y[rownames(resNoFilt$table)[resNoFilt$table$FDR<0.01 & abs(resNoFilt$table$logFC)>1.5],]
+  selY <- y[rownames(resNoFilt$table)[resNoFilt$table$FDR<thres_FDR & abs(resNoFilt$table$logFC)>thres_logFC],]
   cimColor <- colorRampPalette(rev(brewer.pal(9, "Blues")))(255)[255:1]
   finalHM <- cim(t(selY), color=cimColor, symkey=FALSE, margins=c(0.1,0.1))
 
   cat("\n\ncreate a MA plot with 1% differentially expressed genes\n\n")
-  plotSmear(dgeTest, de.tags = rownames(resNoFilt$table)[which(resNoFilt$table$FDR<0.01)], xlab = "Average LogCPM", ylab="logFC")
+  plotSmear(dgeTest, de.tags = rownames(resNoFilt$table)[which(resNoFilt$table$FDR < thres_FDR)], xlab = "Average LogCPM", ylab="logFC")
 
   cat("\n\n#### gene clustering \n\n")
 
