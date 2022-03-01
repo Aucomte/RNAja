@@ -86,10 +86,10 @@ def final_return(wildcards):
                      "baminfo" : f"{out_dir}/2_mapping/bamfile_info.txt",
                      "STRINGTIE" : expand(f'{out_dir}/3_count/STRINGTIE/{{fastq}}.gtf', fastq = SAMPLE_NAME),
                      "STRINGTIE_list" : f'{out_dir}/3_count/STRINGTIE/HISAT_Stringtie_list.txt',
-                     "gffcompare_stat" : f'{out_dir}/3_count/STRINGTIE/merged.stats',
+                     #"gffcompare_stat" : f'{out_dir}/3_count/STRINGTIE/merged.stats',
                      "gcsv_hisat" : f'{out_dir}/3_count/STRINGTIE/HISAT_gene_count_matrix.csv',
                      "tcsv_hisat" : f'{out_dir}/3_count/STRINGTIE/HISAT_transcript_count_matrix.csv',
-                     "sRNA_diff_exp_html" : f"{out_dir}/4_DE_analysis/edger.html"
+                     "RNA_diff_exp" : f"{out_dir}/4_DE_analysis/diane_Counts.csv"
                      }
     return dico_final
 
@@ -469,10 +469,11 @@ rule diff_exp_analysis:
         normCount= f"{out_dir}/4_DE_analysis/normcount.csv",
         Counts=f"{out_dir}/4_DE_analysis/Counts.csv",
         resDE= f"{out_dir}/4_DE_analysis/resDE.csv",
-        cutoff_cpm=config["DE"]["cutoff_cpm"],
-        cutoff_nb_echantillons=config["DE"]["cutoff_nb_echantillons"],
-        thres_FDR=config["DE"]["thres_FDR"],
-        thres_logFC=config["DE"]["thres_logFC"],
+        dianeCounts=f"{out_dir}/4_DE_analysis/diane_Counts.csv",
+        #cutoff_cpm=config["DE"]["cutoff_cpm"],
+        #cutoff_nb_echantillons=config["DE"]["cutoff_nb_echantillons"],
+        #thres_FDR=config["DE"]["thres_FDR"],
+        #thres_logFC=config["DE"]["thres_logFC"],
     output:
         html_output = f"{out_dir}/4_DE_analysis/edger.html",
     log:
@@ -481,4 +482,4 @@ rule diff_exp_analysis:
     singularity:
         config["SINGULARITY"]["MAIN"]
     script:
-        f"{RNAja.RNAJA_SCRIPTS}/edger.Rmd"
+        f"{RNAja.RNAJA_SCRIPTS}/EdgeR.R"

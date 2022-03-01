@@ -44,6 +44,8 @@ suppressMessages(library('Rsubread', warn.conflict = FALSE, quietly = TRUE))
 ```
 
 ```{r include=FALSE}
+#http://www.bioconductor.org/packages/release/bioc/vignettes/edgeR/inst/doc/edgeRUsersGuide.pdf
+
 #opts_knit$set(root.dir = snakemake@params[["out_dir"]])
 
 ##################### LOADING PARAMS FROM SNAKEMAKE OBJECT ######################
@@ -67,9 +69,10 @@ thres_logFC <- snakemake@params[["thres_logFC"]]
 ```
 ```{r include=FALSE}
 #test
-#gcsv_hisat <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/output2/3_count/STRINGTIE/HISAT_gene_count_matrix.csv"
-#sample_info <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/DATA/sample_info.txt"
-#comparaisons_file <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/DATA/treatmentsComparisons.csv"
+
+#gcsv_hisat <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/output/3_count/STRINGTIE/HISAT_gene_count_matrix.csv"
+#sample_info <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/DATA/sample_info_all.txt"
+#comparaisons_file <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/DATA/treatmentsComparisons_all.csv"
 #outDir <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/test"
 #invisible(dir.exists(outDir) || dir.create(path = outDir, mode = "770"))
 #normCount_file <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/test/normCounts"
@@ -77,34 +80,44 @@ thres_logFC <- snakemake@params[["thres_logFC"]]
 #resDE_file <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/test/resde"
 #gtf_file="/home/comtea/Documents/PHIM/BURKADAPT/RNAja/DATA/ref/msu7.gtf"
 
+#cutoff_cpm <- 5
+#cutoff_nb_echantillons <- 2
+#thres_FDR <- 0.01
+#thres_logFC <- 1.5
+```
+
+```{r include = FALSE}
+# test en fonction des paires
+comp = read.csv(comparaisons_file)
+pair_txt = matrix(nrow=nrow(comp),ncol=2)
+for (lines in 1:nrow(comp)){
+  pair_txt[lines,1] = lines
+  pair_txt[lines,2] = knit_expand(text= "\n\n## {{comp[lines,1]}},{{comp[lines,2]}}\n\n")
+}
 ```
 
 # creation DGEList object
 
 ```{r}
-pheno_data <- read.csv(sample_info)
-sampleInfo <- data.frame(fileName= pheno_data$SampleName, condition = pheno_data$Treatment, replicate= pheno_data$Experiment)
-rawCountTable <- as.matrix(read.csv(gcsv_hisat,row.names="gene_id"))
+  pheno_data <- read.csv(sample_info)
+  sampleInfo <- data.frame(fileName= pheno_data$SampleName, condition = pheno_data$Treatment, replicate= pheno_data$Experiment)
+  rawCountTable <- as.matrix(read.csv(gcsv_hisat,row.names="gene_id"))
 
-dgList <- DGEList(rawCountTable, group=sampleInfo$condition, genes=rownames(rawCountTable))
-# longueur des genes utile si on veut faire du RPKM :
-SAF <- Rsubread::flattenGTF(gtf_file)
-GeneLength <- rowsum(SAF$End-SAF$Start+1, SAF$GeneID)
-GeneLength <- as.matrix(GeneLength)
-dgList$genes$Length=GeneLength
-dgList$genes$Length = as.numeric(as.character(dgList$genes$Length))
-dgList
-summary(cpm(dgList))
+  dgList <- DGEList(rawCountTable, group=sampleInfo$condition, genes=rownames(rawCountTable))
+  summary(cpm(dgList))
+
 ```
-# filtering
+# filtering and normalization
 
-First get rid of genes which did not occur frequently enough. We can choose this cutoff by saying we must have at least 2 counts per million (calculated with cpm() in R) on any particular gene that we want to keep. In this example, we're only keeping a gene if it has a cpm of 2 or greater for at least two samples.
+Genes with very low counts across all libraries provide little evidence for differential expression.
+In the biological point of view, a gene must be expressed at some minimal level before it is likely
+to be translated into a protein or to be biologically important.
+The filterByExpr function keeps rows that have worthwhile counts in a minumum number of samples
 
 ```{r}
-countsPerMillion <- cpm(dgList)
-countCheck <- countsPerMillion > cutoff_cpm
-keep <- which(rowSums(countCheck) >= cutoff_nb_echantillons)
-dgList <- dgList[keep,]
+keep <- filterByExpr(dgList)
+table(keep)
+dgList <- dgList[keep, , keep.lib.sizes=FALSE]
 summary(cpm(dgList))
 ```
 ```{r}
@@ -112,7 +125,6 @@ dgList <- calcNormFactors(dgList, method="TMM")
 
 eff.lib.size <- dgList$samples$lib.size*dgList$samples$norm.factors
 normCounts <- cpm(dgList)
-#normCounts <- rpkm(dgList)
 
 write.table(dgList$counts,file=counts_file,sep=";")
 write.table(normCounts, file=normCount_file, sep=";")
@@ -124,51 +136,50 @@ write.table(normCounts, file=normCount_file, sep=";")
 plotMDS(dgList)
 ```
 
-```{r}
-pseudoCounts <- log2(dgList$counts+1)
-sampleDists <- as.matrix(dist(t(pseudoCounts)))
 
-#Boxplot for pseudo-counts
-boxplot(pseudoCounts, col="gray", las=3)
-
-```
-```{r}
-cimColor <- colorRampPalette(rev(brewer.pal(9, "Blues")))(16)
-cim(sampleDists, color=cimColor, symkey=FALSE, zoom=FALSE)
-#cim(sampleDists, color=cimColor, symkey=FALSE, zoom=TRUE)
-#mypalette <- brewer.pal(11,"RdYlBu")
-#morecols <- colorRampPalette(mypalette)
-#heatmap(sampleDists, col = morecols)
-```
-
-# Differential expression analysis
-
-## estimating the dispersion
+# design matrix and estimating the dispersion
 
 ```{r}
-dgList <- estimateCommonDisp(dgList)
-dgList <- estimateTagwiseDisp(dgList)
-dgList
-plotBCV(dgList)
+Treat = factor(sampleInfo$condition)
+Treat = relevel(Treat, ref="FC")
+design <- model.matrix(~Treat)
+logFC <- predFC(dgList,design,prior.count=1,dispersion=0.05)
+cor(logFC[,4:6])
+
+design <- model.matrix(~Time+Treat)
+rownames(design) <- colnames(dgList)
+design
+
+library(statmod)
+
+dgList <- estimateDisp(dgList, design, robust=TRUE)
+fit <- glmQLFit(dgList, design, robust=TRUE)
+plotQLDisp(fit)
+
+qlf <- glmQLFTest(fit, coef=2:3)
+topTags(qlf)
+
+FDR <- p.adjust(qlf$table$PValue, method="BH")
+sum(FDR < 0.05)
+qlf <- glmQLFTest(fit)
+topTags(qlf)
+top <- rownames(topTags(qlf))
+cpm(dgList)[top,]
+summary(decideTests(qlf))
+plotMD(qlf)
+abline(h=c(-1,1), col="blue")
 ```
 
 
-## DE and result
+# DE and result
 
-```{r include = FALSE}
-# test en fonction des paires
-comp = read.csv(comparaisons_file)
-pair_txt = matrix(nrow=nrow(comp),ncol=2)
-for (lines in 1:nrow(comp)){
-  pair_txt[lines,1] = lines
-  pair_txt[lines,2] = knit_expand(text= "\n\n### {{comp[lines,1]}},{{comp[lines,2]}}\n\n")
-}
-```
+
 
 ```{r, echo=FALSE,include = FALSE}
 # You need this code to conduct the magic dependences attaching...
 DT::datatable(matrix())
 ```
+
 ```{r, results='asis', echo=FALSE, message = FALSE, warning = FALSE}
 for (lines in 1:nrow(comp)){
   cat(paste(knit(text = pair_txt[lines,2]), collapse = '\n'))
@@ -185,7 +196,7 @@ for (lines in 1:nrow(comp)){
   cat("\n\nnumber of differencialy expressed genes (risk: 1%)\n\n")
 
   sum(resNoFilt$table$FDR < thres_FDR)
-  
+
   sigDownReg <- resNoFilt$table[resNoFilt$table$FDR<thres_FDR,]
   sigDownReg <- sigDownReg[order(sigDownReg$logFC),]
    cat(knitr::knit_print((DT::datatable(sigDownReg))))
@@ -207,7 +218,7 @@ for (lines in 1:nrow(comp)){
 
   plot(finalHM$ddc, leaflab="none")
   abline(h=10, lwd=2, col="pink")
-  
+
   geneClust <- cutree(as.hclust(finalHM$ddc), h=10)
 
   x = matrix(nrow = length(unique(geneClust)), ncol = 2)
@@ -218,4 +229,3 @@ for (lines in 1:nrow(comp)){
   cat(knitr::knit_print(DT::datatable(x)))
 }
 ```
-
