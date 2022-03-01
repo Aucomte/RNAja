@@ -5,7 +5,7 @@
 Run RNAja
 ========================
 
-You must provide data paths, options and singulartity path in the `config.yaml`` file
+You must provide data paths, options and singulartity path in the ``config.yaml`` file
 
 To create file juste run
 
@@ -28,13 +28,6 @@ First, indicate the data path in the configuration ``config.yaml`` file:
             'annotation': "DATA/ref/msu7.gtf"
             'sample_info': "DATA/sample_info.txt"
             'de_comparisons_file': "DATA/treatmentsComparisons.csv"
-    'DE':
-    # filtering
-        'cutoff_cpm': 5
-        'cutoff_nb_echantillons': 2
-    # threshold DE
-        'thres_FDR': 0.01
-        'thres_logFC': 1.5
 
 .. ############################################################
 

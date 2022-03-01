@@ -18,7 +18,7 @@ invisible(dir.exists(outDir) || dir.create(path = outDir, mode = "770"))
 normCount_file <- snakemake@params[["normCount"]]
 counts_file <- snakemake@params[["Counts"]]
 #resDE_file <- snakemake@params[["resDE"]]
-diane_counts_file <- snakemake@params[["dianeCounts"]]
+diane_counts_file <- snakemake@output[["dianeCounts"]]
 
 # ---------------------------------------------------------------------------------
 

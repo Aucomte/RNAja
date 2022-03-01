@@ -475,7 +475,7 @@ rule diff_exp_analysis:
         #thres_FDR=config["DE"]["thres_FDR"],
         #thres_logFC=config["DE"]["thres_logFC"],
     output:
-        html_output = f"{out_dir}/4_DE_analysis/edger.html",
+        dianeCounts=f"{out_dir}/4_DE_analysis/diane_Counts.csv",
     log:
         error = f"{log_dir}/diff_exp_analysis.e",
         output = f"{log_dir}/diff_exp_analysis.o"
