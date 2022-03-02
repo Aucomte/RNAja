@@ -24,7 +24,7 @@ version = RNAja.__version__
 release = RNAja.__version__
 
 #rst_prolog = f"""
-#.. |tools_path| replace:: {RNAJA_TOOLS_PATH}
+#.. |tools_path| replace:: {GIT_TOOLS_PATH}
 #"""
 
 # -- Project information -----------------------------------------------------
