@@ -21,6 +21,7 @@ First install RNAja python package with pip.
 
 .. code-block:: bash
 
+   git clone git@github.com:Aucomte/RNAja.git
    python3 -m pip install -e .
    RNAja --help
 
