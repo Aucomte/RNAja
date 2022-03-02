@@ -8,8 +8,11 @@ suppressMessages(library('Cairo', warn.conflict = FALSE, quietly = TRUE))
 suppressMessages(library('plotly', warn.conflict = FALSE, quietly = TRUE))
 suppressMessages(library('Rsubread', warn.conflict = FALSE, quietly = TRUE))
 
+# input file
+
+gcsv_hisat <- snakemake@input[["gcsv_hisat"]]
 sample_info <- snakemake@input[["sample_info"]]
-comparaisons_file <- snakemake@input[["de_comparisons_file"]]
+# <- snakemake@input[["de_comparisons_file"]]
 gtf_file <- snakemake@input[["gtf_file"]]
 
 outDir <- snakemake@params[["out_dir"]]

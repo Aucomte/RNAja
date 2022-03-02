@@ -2,12 +2,11 @@
 # Input output data options
 'DATA':
     'directories':
-        'out_dir': "output2"       # Out directory
+        'out_dir': "output_all"       # Out directory
     'files':
         'reference': "DATA/ref/allcon.fasta"
         'annotation': "DATA/ref/msu7.gff3"
-        'sample_info': "DATA/sample_info.txt"
-        'de_comparisons_file': "DATA/treatmentsComparisons.csv"
+        'sample_info': "DATA/sample_info_all.txt"
 
 SINGULARITY:
     "MAIN": "RNAja/envs/Singularity.RNAja.sif"

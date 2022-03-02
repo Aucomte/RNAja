@@ -462,12 +462,12 @@ rule diff_exp_analysis:
     input:
         gcsv_hisat=rules.prepDE_stringtie_table.output.gcsv_hisat,
         sample_info=config["DATA"]["files"]["sample_info"],
-        de_comparisons_file=config["DATA"]["files"]["de_comparisons_file"],
+        #de_comparisons_file=config["DATA"]["files"]["de_comparisons_file"],
         gtf_file=config["DATA"]["files"]["annotation"],
     params:
-        out_dir = lambda w, output: os.path.dirname(output.html_output),
-        normCount= f"{out_dir}/4_DE_analysis/normcount.csv",
-        Counts=f"{out_dir}/4_DE_analysis/Counts.csv",
+        out_dir = lambda w, output: os.path.dirname(output.dianeCounts),
+        normCount= f"{out_dir}/4_DE_analysis/filtered_normCounts.csv",
+        Counts=f"{out_dir}/4_DE_analysis/filtered_Counts.csv",
         resDE= f"{out_dir}/4_DE_analysis/resDE.csv",
         dianeCounts=f"{out_dir}/4_DE_analysis/diane_Counts.csv",
         #cutoff_cpm=config["DE"]["cutoff_cpm"],

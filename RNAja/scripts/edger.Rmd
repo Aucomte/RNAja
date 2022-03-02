@@ -70,20 +70,15 @@ thres_logFC <- snakemake@params[["thres_logFC"]]
 ```{r include=FALSE}
 #test
 
-#gcsv_hisat <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/output/3_count/STRINGTIE/HISAT_gene_count_matrix.csv"
-#sample_info <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/DATA/sample_info_all.txt"
-#comparaisons_file <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/DATA/treatmentsComparisons_all.csv"
-#outDir <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/test"
-#invisible(dir.exists(outDir) || dir.create(path = outDir, mode = "770"))
-#normCount_file <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/test/normCounts"
-#counts_file <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/test/Counts"
-#resDE_file <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/test/resde"
-#gtf_file="/home/comtea/Documents/PHIM/BURKADAPT/RNAja/DATA/ref/msu7.gtf"
-
-#cutoff_cpm <- 5
-#cutoff_nb_echantillons <- 2
-#thres_FDR <- 0.01
-#thres_logFC <- 1.5
+gcsv_hisat <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/output/3_count/STRINGTIE/HISAT_gene_count_matrix.csv"
+sample_info <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/DATA/sample_info_all.txt"
+comparaisons_file <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/DATA/treatmentsComparisons_all.csv"
+outDir <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/test"
+invisible(dir.exists(outDir) || dir.create(path = outDir, mode = "770"))
+normCount_file <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/test/normCounts"
+counts_file <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/test/Counts"
+resDE_file <- "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/test/resde"
+gtf_file="/home/comtea/Documents/PHIM/BURKADAPT/RNAja/DATA/ref/msu7.gtf"
 ```
 
 ```{r include = FALSE}
@@ -100,10 +95,20 @@ for (lines in 1:nrow(comp)){
 
 ```{r}
   pheno_data <- read.csv(sample_info)
-  sampleInfo <- data.frame(fileName= pheno_data$SampleName, condition = pheno_data$Treatment, replicate= pheno_data$Experiment)
+
+  sampleInfo <- data.frame(fileName= pheno_data$SampleName)
+  for (i in 3:ncol(pheno_data)){
+    sampleInfo <- cbind(sampleInfo, Condition = pheno_data[,i])
+  }
+  N_groups = ""
+  for (i in 2:ncol(sampleInfo)){
+    N_groups = paste0(N_groups,sampleInfo[,i])
+  }
+  N = length(unique(N_groups))
+
   rawCountTable <- as.matrix(read.csv(gcsv_hisat,row.names="gene_id"))
 
-  dgList <- DGEList(rawCountTable, group=sampleInfo$condition, genes=rownames(rawCountTable))
+  dgList <- DGEList(rawCountTable, group=rep(1:N,each=3), genes=rownames(rawCountTable))
   summary(cpm(dgList))
 
 ```
@@ -140,15 +145,21 @@ plotMDS(dgList)
 # design matrix and estimating the dispersion
 
 ```{r}
-Treat = factor(sampleInfo$condition)
-Treat = relevel(Treat, ref="FC")
-design <- model.matrix(~Treat)
+
+Matrice = unique(sampleInfo[,2:ncol(sampleInfo)])
+x <- model.frame(Matrice)
+options("contrasts")
+model.matrix(~ Condition + Condition.1, x)
+design <- model.matrix(x)
+rownames(design) <- colnames(dgList)
+design
+
+
 logFC <- predFC(dgList,design,prior.count=1,dispersion=0.05)
 cor(logFC[,4:6])
 
-design <- model.matrix(~Time+Treat)
-rownames(design) <- colnames(dgList)
-design
+
+
 
 library(statmod)
 

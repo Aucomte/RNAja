@@ -22,12 +22,11 @@ First, indicate the data path in the configuration ``config.yaml`` file:
 
     'DATA':
         'directories':
-            'out_dir': "output2"
+            'out_dir': "output"
         'files':
             'reference': "DATA/ref/allcon.fasta"
             'annotation': "DATA/ref/msu7.gtf"
             'sample_info': "DATA/sample_info.txt"
-            'de_comparisons_file': "DATA/treatmentsComparisons.csv"
 
 .. ############################################################
 
