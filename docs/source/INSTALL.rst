@@ -21,7 +21,7 @@ First install RNAja python package with pip.
 
 .. code-block:: bash
 
-   python3 -m pip install RNAja
+   python3 -m pip install -e .
    RNAja --help
 
 Then run the commande line to install on LOCAL

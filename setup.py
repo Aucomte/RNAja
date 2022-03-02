@@ -4,11 +4,14 @@
 import os
 from pathlib import Path
 from setuptools import setup, find_packages
+import site
+import sys
 
 NAME = 'RNAja'
 URL = 'https://github.com/Aucomte/RNAja'
 CURRENT_PATH = Path(__file__).resolve().parent
-VERSION = CURRENT_PATH.joinpath(f'RNAja','VERSION').open('r').readline().strip()
+VERSION = CURRENT_PATH.joinpath('RNAja','VERSION').open('r').readline().strip()
+site.ENABLE_USER_SITE = "--user" in sys.argv[1:]
 
 def main():
     setup(
@@ -47,7 +50,9 @@ def main():
         include_package_data=True,
         python_requires='>=3.6',
         install_requires=[
+            'cookiecutter',
             'snakemake',
+            'tqdm',
             'docutils<0.18',
             'click>=8.0.3'
         ],
