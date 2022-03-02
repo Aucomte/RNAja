@@ -6,7 +6,7 @@ import os
 
 @click.command("run_local", short_help='Run workflow on local computer (use singularity mandatory)', context_settings=dict(ignore_unknown_options=True, max_content_width=800),
                no_args_is_help=True)
-@click.option('--config', '-c', type=click.Path(exists=True, file_okay=True, readable=True, resolve_path=True), required=True, help='Configuration file for run culebrONT')
+@click.option('--config', '-c', type=click.Path(exists=True, file_okay=True, readable=True, resolve_path=True), required=True, help='Configuration file for run RNAja')
 @click.option('--threads', '-t', type=int, required=True, help='number of threads')
 @click.option('--pdf', '-p', is_flag=True, required=False, default=False, help='run snakemake with --dag, --rulegraph and --filegraph')
 @click.argument('snakemake_other', nargs=-1, type=click.UNPROCESSED)
@@ -14,7 +14,7 @@ def run_local(config, threads, pdf, snakemake_other):
     """    Run snakemake command line with mandatory parameters.
     SNAKEMAKE_OTHER: append other snakemake command such '--dry-run'
     Example:
-        culebrONT run_local -c config.yaml --dry-run
+        RNAja run_local -c config.yaml --dry-run
     """
     # get user arguments
     click.secho(f'    Config file: {config}', fg='yellow')

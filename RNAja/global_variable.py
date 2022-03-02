@@ -7,7 +7,7 @@ from pathlib import Path
 # Hack for build docs with unspecified path install
 args = str(sys.argv)
 if "sphinx" in args:
-    RNAJA_PATH = Path("/Path/to/culebrONT_install/")
+    RNAJA_PATH = Path("/Path/to/RNAja_install/")
 else:
     RNAJA_PATH = Path(__file__).resolve().parent
     RNAJA_SNAKEFILE = RNAJA_PATH.joinpath("snakefiles", "Snakefile")

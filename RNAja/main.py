@@ -15,9 +15,9 @@ def main(ctx, restore):
     if ctx.invoked_subcommand is None and restore and check_privileges():
         if RNAJA_MODE.exists():
             RNAJA_MODE.unlink(missing_ok=False)
-            click.secho(f"\n    Remove installation mode, now run:\n    culebrONT install_local or install_cluster\n\n", fg="yellow")
+            click.secho(f"\n    Remove installation mode, now run:\n    RNAja install_local or install_cluster\n\n", fg="yellow")
         else:
-            click.secho(f"\n    No reset need, culebrONT not install !!!!!\n    Please run: culebrONT install_local or install_cluster !!!!\n\n", fg="red")
+            click.secho(f"\n    No reset need, RNAja not install !!!!!\n    Please run: RNAja install_local or install_cluster !!!!\n\n", fg="red")
     pass
 
 
