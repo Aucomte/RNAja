@@ -18,7 +18,7 @@ def main():
         url=URL,
         project_urls={
             'Bug Tracker': f'{URL}/issues',
-            #'Documentation': f'https://{NAME}.readthedocs.io/en/latest/',
+            'Documentation': f'https://{NAME}.readthedocs.io/en/latest/',
             'Source Code': URL
         },
         download_url=f'{URL}/archive/{VERSION}.tar.gz',
@@ -30,14 +30,14 @@ def main():
         license='GPLv3',
 
         # docs compilation utils
-        #command_options={
-        #    'build_sphinx': {
-        #        'project': ('setup.py', NAME),
-        #        'version': ('setup.py', VERSION),
-        #        'release': ('setup.py', VERSION),
-        #        'source_dir': ('setup.py', CURRENT_PATH.joinpath('docs','source').as_posix()),
-        #        'build_dir': ('setup.py', CURRENT_PATH.joinpath('docs','build').as_posix()),
-        #    }},
+        command_options={
+            'build_sphinx': {
+                'project': ('setup.py', NAME),
+                'version': ('setup.py', VERSION),
+                'release': ('setup.py', VERSION),
+                'source_dir': ('setup.py', CURRENT_PATH.joinpath('docs','source').as_posix()),
+                'build_dir': ('setup.py', CURRENT_PATH.joinpath('docs','build').as_posix()),
+            }},
 
         # Package information
         packages=find_packages(),
