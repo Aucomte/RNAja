@@ -14,6 +14,11 @@
 
 import sys
 import os
+
+sys.path.insert(0, os.path.abspath('../../'))
+# load own functions
+
+
 import sphinx_rtd_theme
 import RNAja
 from RNAja.global_variable import *
