@@ -14,7 +14,7 @@ To create file juste run
    RNAja create_config --help
    RNAja create_config -configyaml Path/to/file
 
-Then edit section on file according to your workflow.
+Then edit section on file according to your data.
 
 First, indicate the data path in the configuration ``config.yaml`` file:
 
@@ -27,6 +27,33 @@ First, indicate the data path in the configuration ``config.yaml`` file:
             'reference': "DATA/ref/allcon.fasta"
             'annotation': "DATA/ref/msu7.gtf"
             'sample_info': "DATA/sample_info.txt"
+
+
+.. csv-table::
+
+        "Input", "Description"
+        "out_dir", "path / name of the output directory"
+        "reference", "Only one REFERENCE genome file (fasta file)"
+        "annotation", "Annotation file corresponding to the reference file (gtf or gff)"
+        "sample_info", "path of the file containing information on the sample and the experimental design (csv or txt, separator = ',')"
+
+
+exemple of sample_info file:
+
+.. csv-table::
+
+        "FileName", "SampleName", "Condition1", "Condition2"
+        "/path/to/fastq/Control1", "C_1", "Control", "E1"
+        "/path/to/fastq/Control2", "C_2", "Control", "E2"
+        "/path/to/fastq/Control3", "C_3", "Control", "E3"
+        "/path/to/fastq/Treatment1", "T_1", "Treat", "E1"
+        "/path/to/fastq/Treatment2", "T_2", "Treat", "E2"
+        "/path/to/fastq/Treatment3", "T_3", "Treat", "E3"
+
+
+.. warning::
+
+    For the column SampleName of the sampleInfo file, the names should be: condition_repetition separated by a _
 
 .. ############################################################
 
