@@ -15,7 +15,7 @@
 import sys
 import os
 import sphinx_rtd_theme
-#import RNAja
+import RNAja
 from RNAja.global_variable import *
 
 # The short X.Y version.
