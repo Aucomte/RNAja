@@ -5,6 +5,7 @@ from shutil import rmtree, copyfile, unpack_archive
 import RNAja
 import os
 import re
+import cookiecutter
 from cookiecutter.main import cookiecutter
 from RNAja.global_variable import *
 from RNAja.usefull_function import command_required_option_from_option, multiprocessing_download, get_install_mode
