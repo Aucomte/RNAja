@@ -91,7 +91,7 @@ def install_local(bash_completion):
     # rm previous install (ie @julie cluster then local)
     clean_home()
     # add path to download
-    RNAJA_PATH.joinpath("containers").mkdir(exist_ok=True, parents=True)
+    RNAJA_PATH.joinpath("envs").mkdir(exist_ok=True, parents=True)
     try:
         check_and_download_singularity()
         # export to add bash completion
