@@ -17,6 +17,6 @@
 
 module load system/python/3.7.2
 module load system/singularity/3.6.0
-module load system/Miniconda3/1.0
+#module load system/Miniconda3/1.0
 
 RNAja run_local -c ${CONFIG} -t 20
