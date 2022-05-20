@@ -24,6 +24,11 @@ invisible(dir.exists(outDir) || dir.create(path = outDir, mode = "770"))
 diane_counts_file <- snakemake@output[["dianeCounts"]]
 
 # ---------------------------------------------------------------------------------
+# test
+#gcsv_hisat = "/home/comtea/Documents/PHIM/AUTRES/smallRNA/RNAseq/output_sev2/3_count/STRINGTIE/HISAT_gene_count_matrix.csv"
+#sample_info = "/home/comtea/Documents/PHIM/BURKADAPT/RNAja/DATA2/sample_info.txt"
+#----------------------------------------------------------------------------------
+
 
 pheno_data <- read.csv(sample_info)
 
@@ -39,7 +44,7 @@ N = length(unique(N_groups))
 
 rawCountTable <- as.matrix(read.csv(gcsv_hisat,row.names="gene_id"))
 
-dgList <- DGEList(rawCountTable, group=rep(1:N,each=3), genes=rownames(rawCountTable))
+#dgList <- DGEList(rawCountTable, group=rep(1:N,each=3), genes=rownames(rawCountTable))
 
 #pheno_data <- read.csv(sample_info)
 #sampleInfo <- data.frame(fileName= pheno_data$SampleName, condition = pheno_data$Condition1, replicate= pheno_data$Condition2)
@@ -53,16 +58,17 @@ df <- data.frame(Gene = row.names(df), df)
 write.table(df, file=diane_counts_file, sep=";", row.names = FALSE)
 
 
-
 # filter
-keep <- filterByExpr(dgList)
-dgList <- dgList[keep, , keep.lib.sizes=FALSE]
+
+#keep <- filterByExpr(dgList)
+#dgList <- dgList[keep, , keep.lib.sizes=FALSE]
 
 # normalisation
-dgList <- calcNormFactors(dgList, method="TMM")
 
-eff.lib.size <- dgList$samples$lib.size*dgList$samples$norm.factors
-normCounts <- cpm(dgList)
+#dgList <- calcNormFactors(dgList, method="TMM")
+
+#eff.lib.size <- dgList$samples$lib.size*dgList$samples$norm.factors
+#normCounts <- cpm(dgList)
 
 # output for diffexdb
 

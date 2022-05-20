@@ -2,11 +2,15 @@
 # Input output data options
 'DATA':
     'directories':
-        'out_dir': "output_all"       # Out directory
+        'out_dir': "output_all_R"       # Out directory
     'files':
-        'reference': "DATA/ref/allcon.fasta"
-        'annotation': "DATA/ref/msu7.gff3"
-        'sample_info': "DATA/sample_info_all.txt"
+        'reference': "DATA/ref/IRGSP-1.0_genome.fasta"
+        'annotation': "DATA/ref/IRGSP-1.0_representative_transcript_exon_2021-11-11.gtf"
+        'sample_info': "DATA/sample_info_all_R.txt"
+        'de_comparisons_file': "DATA2/conditions.txt"
+PARAMS:
+    STRINGTIE:
+        discovery_mode : true
 
 SINGULARITY:
     "MAIN": "RNAja/envs/Singularity.RNAja.sif"
