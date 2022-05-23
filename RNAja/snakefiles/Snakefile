@@ -412,7 +412,7 @@ rule stringtie :
     input:
          bam_index = rules.bam_sort.output.bai_mapped,
          bam_hisat = rules.bam_sort.output.mapped_hisat,
-         gtf = f"{rules.stringtie_gtf_list_discovery.output.gtf_hisat}" if config["PARAMS"]["STRINGTIE"]["discovery_mode"] else f'{annotation_path}'
+         gtf = f"{rules.merge_stringtie_gtf_discovery.output.gtf_merged}" if config["PARAMS"]["STRINGTIE"]["discovery_mode"] else f'{annotation_path}'
     output:
          hisat_gtf= f'{out_dir}/3_count/STRINGTIE/{{fastq}}.gtf',
          hisat_tsv = f'{out_dir}/3_count/STRINGTIE/{{fastq}}.tsv'
